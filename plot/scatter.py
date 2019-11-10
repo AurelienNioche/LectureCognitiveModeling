@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def scatter(data):
     # Create fig
     fig, axes = plt.subplots(nrows=len(data.keys()), figsize=(5, 10))
