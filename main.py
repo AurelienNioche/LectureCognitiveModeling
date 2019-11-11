@@ -12,6 +12,7 @@ from matplotlib.ticker import MaxNLocator
 import pandas as pd
 import scipy.optimize
 import statsmodels.stats
+import statsmodels.stats.proportion
 import scipy.stats
 from tqdm.autonotebook import tqdm
 
@@ -40,13 +41,13 @@ class Random:
         p = self.decision_rule()
         return np.random.choice(self.options, p=p)
 
-    def learn(self, i, success):
-        self.updating_rule(i=i, success=success)
+    def learn(self, option, success):
+        self.updating_rule(option=option, success=success)
 
     def decision_rule(self):
         return np.ones(self.n_option) / self.n_option
 
-    def updating_rule(self, i, success):
+    def updating_rule(self, option, success):
         pass
 
 
@@ -56,6 +57,8 @@ class RL(Random):
     """
     Reinforcement learning model
     """
+
+    bounds = (0, 1), (0.01, 1)
 
     def __init__(self, learning_rate, temp, n_option, initial_value=0.5):
         super().__init__(n_option=n_option)
@@ -69,16 +72,17 @@ class RL(Random):
              np.sum(np.exp(self.values / self.temp), axis=0)
         return p_soft
 
-    def updating_rule(self, i, success):
-        self.values[i] += self.learning_rate * (success - self.values[i])
+    def updating_rule(self, option, success):
+        self.values[option] += \
+            self.learning_rate * (success - self.values[option])
 
 
-# # %% md
-#
-# # 3. Simulate
-#
-# # %%
-#
+# %% md
+
+# 3. Simulate
+
+# %%
+
 def run_simulation(agent_model, param, n_iteration, n_option,
                    prob_dist):
     if param is not None:
@@ -100,120 +104,148 @@ def run_simulation(agent_model, param, n_iteration, n_option,
                                    p=np.array([1 - p_success, p_success]))
 
         # Make agent learn
-        agent.learn(i=choice, success=success)
+        agent.learn(option=choice, success=success)
 
         # Backup
         choices[t] = choice
         successes[t] = success
 
     return choices, successes
-#
+
+
+# # %%
+
+models = Random, RL
+params = None, (0.01, 0.1)
+
+n_models = len(models)
+
+hist_choices = {}
+hist_successes = {}
+
+# Simulate the task
+for idx_model in range(n_models):
+    _m = models[idx_model]
+
+    c, s = run_simulation(
+        agent_model=_m, param=params[idx_model],
+        n_iteration=T, n_option=N, prob_dist=P)
+
+    hist_choices[_m.__name__] = c
+    hist_successes[_m.__name__] = s
+
+
+# # %%
+
+
+def basic_scatter(data, y_label="choice", x_label="time"):
+    keys = sorted(data.keys())
+    n_keys = len(keys)
+
+    fig, axes = plt.subplots(ncols=n_keys, figsize=(10, 4))
+
+    colors = [f'C{i}' for i in range(n_keys)]
+
+    for i in range(n_keys):
+        k = keys[i]
+        y = data[k]
+
+        ax = axes[i]
+        ax.scatter(range(len(y)), y, color=colors[i],
+                   alpha=0.2, label=k)
+
+        ax.set_ylim(-0.02, 1.02)
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+basic_scatter(data=hist_choices)
+
+# %%
+
+
+def running_mean(data, y_label='choice', x_label="time", window=20):
+
+    keys = sorted(data.keys())
+    n_keys = len(keys)
+
+    fig, axes = plt.subplots(ncols=n_keys)
+
+    colors = [f'C{i}' for i in range(n_keys)]
+
+    for i in range(n_keys):
+        k = keys[i]
+
+        y = data[k]
+
+        ax = axes[i]
+        ax.plot(pd.Series(y).rolling(window).mean(),
+                color=colors[i], alpha=0.2, label=k)
+        ax.set_ylim(-0.02, 1.02)
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+
+        ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+running_mean(data=hist_choices)
 #
 # # %%
-#
-# np.random.seed(0)
-#
-# learning_rate, temp = 0.01, 0.1
-#
-# models = Random, RL
-# params = None, (learning_rate, temp)
-#
-# n_models = len(models)
-#
-# hist_choices = {}
-# hist_successes = {}
-#
-# # Simulate the task
-# for i in range(n_models):
-#     m = models[i]
-#
-#     choices, successes = run_simulation(
-#         agent_model=m, param=params[i],
-#         n_iteration=T, n_option=N, prob_dist=P)
-#
-#     hist_choices[m.__name__] = choices
-#     hist_successes[m.__name__] = successes
-#
-#
-# # %%
-#
-# def basic_scatter(data, y_label="choice", x_label="time"):
-#     keys = sorted(data.keys())
-#     n_keys = len(keys)
-#
-#     fig, axes = plt.subplots(ncols=n_keys, figsize=(10, 4))
-#
-#     colors = [f'C{i}' for i in range(n_keys)]
-#
-#     for i in range(n_keys):
-#         k = keys[i]
-#         y = data[k]
-#
-#         ax = axes[i]
-#         ax.scatter(range(len(y)), y, color=colors[i],
-#                    alpha=0.2, label=k)
-#
-#         ax.set_ylim(-0.02, 1.02)
-#         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-#
-#         ax.set_xlabel(x_label)
-#         ax.set_ylabel(y_label)
-#         ax.legend()
-#
-#     plt.tight_layout()
-#     plt.show()
-#
-#
-# basic_scatter(data=hist_choices)
-#
-#
-# # %%
-#
-# def running_mean(data, y_label='choice', x_label="time", window=20):
-#     keys = sorted(data.keys())
-#     n_keys = len(keys)
-#
-#     fig, axes = plt.subplots(ncols=n_keys)
-#
-#     colors = [f'C{i}' for i in range(n_keys)]
-#
-#     for i in range(n_keys):
-#         k = keys[i]
-#
-#         y = data[k]
-#
-#         ax = axes[i]
-#         ax.plot(pd.Series(y).rolling(window).mean(),
-#                 color=colors[i], alpha=0.2, label=k)
-#         ax.set_ylim(-0.02, 1.02)
-#
-#         ax.set_xlabel(x_label)
-#         ax.set_ylabel(y_label)
-#
-#         ax.legend()
-#     plt.tight_layout()
-#     plt.show()
-#
-#
-# running_mean(data=hist_choices)
-#
-# # %%
-#
-# import statsmodels.stats.proportion
-# import scipy.stats
-#
-# for i in range(n_models):
-#     m = models[i]
-#     choices = hist_choices[m.__name__]
-#
-#     k, n = np.sum(choices), len(choices)
-#     print(statsmodels.stats.proportion.proportion_confint(count=k, nobs=n))
-#     freq_yes = k / n
-#     freq_no = 1 - freq_yes
-#     chi2, p = scipy.stats.chisquare((k, n - k))
-#     print(chi2, p)
-#
-#
+
+
+def format_p(p, threshold=0.05):
+    pf = f'={p:.3f}' if p >= 0.001 else '<0.001'
+    pf += " *" if p <= threshold else " NS"
+    return pf
+
+
+def stats():
+
+    contingency_table = np.zeros((n_models, N))
+
+    for i in range(n_models):
+
+        m = models[i]
+        m_name = m.__name__
+        choices = hist_choices[m_name]
+
+        k, n = np.sum(choices), len(choices)
+
+        obs = n-k, k
+
+        ci_low, ci_upp = \
+            statsmodels.stats.proportion.proportion_confint(count=k, nobs=n)
+
+        print(f"Model: {m_name}")
+        print(f"prop choose best= {k/n:.3f}, CI=[{ci_low:.3f}, {ci_upp:.3f}]")
+
+        chi2, p = scipy.stats.chisquare(obs)
+        print("Chi2 for equality of proportion")
+        print(f"Chi2={chi2:.3f}, p{format_p(p)}")
+        print()
+
+        contingency_table[i] = obs
+
+    chi2, p, dof, ex = scipy.stats.chi2_contingency(contingency_table,
+                                                    correction=False)
+    # chi2, p = scipy.stats.chisquare((k, n - k))
+    print("Chi2 for independence")
+    print(f"Chi2={chi2:.3f}, p{format_p(p)}")
+    print()
+
+
+stats()
+
+
 # # %%
 
 
@@ -235,7 +267,10 @@ class BanditOptimizer:
     def objective(self, param):
 
         n_iteration = len(self.choices)
-        agent = self.model(n_option=self.n_option, *param)
+        if param is not None:
+            agent = self.model(n_option=self.n_option, *param)
+        else:
+            agent = self.model(n_option=self.n_option)
 
         log_likelihood = np.zeros(n_iteration)
 
@@ -249,7 +284,7 @@ class BanditOptimizer:
             log_likelihood[t] = np.log(p_choice + EPS)
 
             # Make agent learn
-            agent.learn(i=choice, success=success)
+            agent.learn(option=choice, success=success)
 
         lls = np.sum(log_likelihood)
         v = -lls
@@ -325,7 +360,7 @@ def param_recovery(
 BKP_FOLDER = "bkp"
 os.makedirs(BKP_FOLDER, exist_ok=True)
 bkp_file = os.path.join(BKP_FOLDER, "param_recovery.p")
-force = True
+force = False
 
 if not os.path.exists(bkp_file) or force:
     param_rcv = param_recovery()
@@ -360,17 +395,6 @@ def scatter(data):
         ax.set_xticks((0, 0.5, 1))
         ax.set_yticks((0, 0.5, 1))
 
-        # max_ = max(x+y)
-        # min_ = min(x+y)
-        #
-        # ax.set_xlim(min_, max_)
-        # ax.set_ylim(min_, max_)
-
-        # ticks_positions = [round(j, 2) for j in np.linspace(min_, max_, 3)]
-
-        # ax.set_xticks(ticks_positions)
-        # ax.set_yticks(ticks_positions)
-
         ax.plot(range(2), linestyle="--", alpha=0.2, color="black", zorder=-10)
 
         ax.set_aspect(1)
@@ -396,13 +420,47 @@ def correlation_recovery(data):
 
         x, y = data[k]
         cor, p = scipy.stats.pearsonr(x, y)
-        print(f"[{k}] cor={cor}, p={p:.3f}")
+        print(f"[{k}] cor={cor:.3f}, p{format_p(p)}")
+
+    print()
+
 
 # %%
 
-
+correlation_recovery(param_rcv)
 
 # %%
+
 
 def bic(ll, k, n_iteration):
     return -2 * ll + k * np.log(n_iteration)
+
+
+opt = BanditOptimizer(
+            n_option=N,
+            choices=hist_choices['RL'],
+            successes=hist_successes['RL'],
+            model=RL,
+            bounds=RL.bounds
+        )
+
+best_param, best_value = opt.run()
+
+bic_score = bic(-best_value, len(RL.bounds), n_iteration=T)
+
+print(f"BIC RL={bic_score:.3f}")
+
+opt = BanditOptimizer(
+            n_option=N,
+            choices=hist_choices['RL'],
+            successes=hist_successes['RL'],
+            model=Random,
+            bounds=None
+        )
+
+best_value = opt.objective(param=None)
+
+bic_score = bic(-best_value, 0, n_iteration=T)
+
+print(f"BIC Random={bic_score:.3f}")
+
