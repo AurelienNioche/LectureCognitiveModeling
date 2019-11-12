@@ -2,12 +2,9 @@
 Modeling of decision-making
 """
 
-
-# %% md
-
-# 0. Import the necessary libraries
-
-# %%
+# =================================================================
+# Import your modules =============================================
+# =================================================================
 
 import os
 import pickle
@@ -21,20 +18,35 @@ import statsmodels.stats.proportion
 import scipy.stats
 from tqdm.autonotebook import tqdm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import itertools as it
 
+# =================================================================
+# Globals =========================================================
+# =================================================================
 
 np.random.seed(123)
 EPS = np.finfo(np.float).eps
 
-# %%
+BKP_FOLDER = "bkp"
+os.makedirs(BKP_FOLDER, exist_ok=True)
+
+USE_PICKLE_FIT = True
+USE_PICKLE_BEST_FIT_COMPARISON = True
+USE_PICKLE_PARAM_RECOVERY = True
+USE_PICKLE_LOCAL_MINIMA = True
+USE_PICKLE_CONFUSION_MATRIX = True
+
+# ======================================================================
+# Design your task =====================================================
+# ======================================================================
 
 N = 2
 P = np.array([0.25, 0.75])
 T = 500
 
+# ======================================================================
+# Design your model(s) but also competitive models =====================
+# ======================================================================
 
-# %%
 
 class Random:
     """
@@ -61,14 +73,12 @@ class Random:
         pass
 
 
-# %%
-
 class RL(Random):
     """
     Reinforcement learning model
     """
     param_labels = ("alpha", "beta")
-    bounds = (0.01, 1), (0.05, 0.1)
+    bounds = (0.01, 1), (0.05, 1)
 
     def __init__(self, learning_rate, temp, n_option, initial_value=0.5):
         super().__init__(n_option=n_option)
@@ -87,13 +97,13 @@ class RL(Random):
             self.learning_rate * (success - self.values[option])
 
 
-# %% md
+MODELS = Random, RL
+
+# Study the effect of your parameters ========================================
 
 
-def plot_learning_parameter():
-
-    param_values = (0.1, 0.25, 0.5)
-    n_iteration = 100
+def plot_learning_parameter(n_iteration=100,
+                            param_values=(0.01, 0.1, 0.2, 0.3)):
 
     n_param_values = len(param_values)
 
@@ -108,47 +118,56 @@ def plot_learning_parameter():
             values[t, i] = agent.values[0]
             agent.learn(option=0, success=1)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4, 4))
     lines = ax.plot(values)
 
     ax.set_xlabel("time")
     ax.set_ylabel("value")
 
-    ax.legend(lines, [r"\alpha=" + f'{v}' for v in param_values])
+    ax.legend(lines, [r"$\alpha=" + f'{v}$' for v in param_values])
 
     plt.plot()
 
 
-def plot_temperature():
+def plot_temperature(param_values=(0.05, 0.25, 0.5, 0.75)):
 
-    param_values = (0.05, 0.5, 1)
-
-    x_values = np.linspace(-1, 1, 100)
+    n_x_values = 100
+    x_values = np.linspace(-1, 1, n_x_values)
 
     n_param_values = len(param_values)
 
     values = np.zeros((len(x_values), n_param_values))
 
     for i in range(n_param_values):
-        alpha = param_values[i]
+        for j in range(n_x_values):
+            x = x_values[j]
+            tau = param_values[i]
+            values[j, i] = 1 / (1 + np.exp(-x/tau))
 
-
-    fig, ax = plt.subplots()
-    ax.plot(values)
+    fig, ax = plt.subplots(figsize=(4, 4))
+    lines = ax.plot(x_values, values)
 
     ax.set_xlabel("Q(A) - Q(B)")
     ax.set_ylabel("p(A)")
 
+    ax.legend(lines, [r"$\tau=" + f'{v}$' for v in param_values])
+
     plt.plot()
 
 
+plot_learning_parameter()
+plot_temperature()
 
-# 3. Simulate
+# =================================================================
+# First artificial experiment =====================================
+# =================================================================
 
-# %%
+# Param for the artificial subject
+PARAM_RL = (0.1, 0.1)
 
-def run_simulation(agent_model, param, n_iteration, n_option,
-                   prob_dist):
+
+def run_simulation(
+        agent_model, param, n_iteration, n_option, prob_dist):
 
     if param is not None:
         agent = agent_model(n_option=n_option, *param)
@@ -165,8 +184,9 @@ def run_simulation(agent_model, param, n_iteration, n_option,
 
         # Determine success
         p_success = prob_dist[choice]
-        success = np.random.choice([0, 1],
-                                   p=np.array([1 - p_success, p_success]))
+        success = np.random.choice(
+            [0, 1],
+            p=np.array([1 - p_success, p_success]))
 
         # Make agent learn
         agent.learn(option=choice, success=success)
@@ -178,39 +198,39 @@ def run_simulation(agent_model, param, n_iteration, n_option,
     return choices, successes
 
 
-# # %%
+def first_artificial_experiment():
 
-PARAM_RL = (0.1, 0.1)
+    params = None, PARAM_RL
 
-MODELS = Random, RL
+    n_models = len(MODELS)
 
+    choices = {}
+    successes = {}
 
-params = None, PARAM_RL
+    # Simulate the task
+    for idx_model in range(n_models):
+        _m = MODELS[idx_model]
 
-n_models = len(MODELS)
+        choices[_m.__name__], successes[_m.__name__] \
+            = run_simulation(
+                agent_model=_m, param=params[idx_model],
+                n_iteration=T, n_option=N, prob_dist=P)
 
-hist_choices = {}
-hist_successes = {}
-
-# Simulate the task
-for idx_model in range(n_models):
-    _m = MODELS[idx_model]
-
-    hist_choices[_m.__name__], hist_successes[_m.__name__] \
-        = run_simulation(
-            agent_model=_m, param=params[idx_model],
-            n_iteration=T, n_option=N, prob_dist=P)
+    return choices, successes
 
 
-# # %%
+HIST_CHOICES, HIST_SUCCESSES = first_artificial_experiment()
+
+
+# Plot results of simulations
 
 def scatter_binary_choices(ax, y, color, label):
 
     ax.scatter(range(len(y)), y, color=color,
                alpha=0.2, label=label)
 
-    ax.set_ylim(-0.02, 1.02)
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.set_ylim(-0.02, 1.02)
 
 
 def curve_rolling_mean(ax, y, color, label, window=50):
@@ -229,14 +249,17 @@ def curve_rolling_mean(ax, y, color, label, window=50):
         alpha=0.2,
         color=color
     )
+    ax.set_ylim(-0.02, 1.02)
 
 
-def multi_plot(data, func, x_label="time", y_label="choice"):
+def multi_plot(data, func,
+               x_label="time",
+               y_label="choice"):
 
     keys = sorted(data.keys())
     n_keys = len(keys)
 
-    fig, axes = plt.subplots(ncols=n_keys, figsize=(10, 4))
+    fig, axes = plt.subplots(ncols=n_keys, figsize=(3*n_keys, 3))
 
     colors = [f'C{i}' for i in range(n_keys)]
 
@@ -252,22 +275,24 @@ def multi_plot(data, func, x_label="time", y_label="choice"):
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
+
         ax.legend()
 
     plt.tight_layout()
     plt.show()
 
 
-# Basic scatterplot
-multi_plot(data=hist_choices, func=scatter_binary_choices)
+# Begin by the more basic possible
+multi_plot(data=HIST_CHOICES, func=scatter_binary_choices)
 
-# Running mean
-multi_plot(data=hist_choices, func=curve_rolling_mean)
-#
-# # %%
+# ...then maybe you can do better
+multi_plot(data=HIST_CHOICES, func=curve_rolling_mean)
 
+
+# (Behavioral) Stats ==========================================================
 
 def format_p(p, threshold=0.05):
+
     pf = f'={p:.3f}' if p >= 0.001 else '<0.001'
     pf += " *" if p <= threshold else " NS"
     return pf
@@ -275,13 +300,15 @@ def format_p(p, threshold=0.05):
 
 def stats():
 
+    n_models = len(MODELS)
+
     contingency_table = np.zeros((n_models, N))
 
     for i in range(n_models):
 
         m = MODELS[i]
         m_name = m.__name__
-        choices = hist_choices[m_name]
+        choices = HIST_CHOICES[m_name]
 
         k, n = np.sum(choices), len(choices)
 
@@ -302,7 +329,6 @@ def stats():
 
     chi2, p, dof, ex = scipy.stats.chi2_contingency(contingency_table,
                                                     correction=False)
-    # chi2, p = scipy.stats.chisquare((k, n - k))
     print("Chi2 for independence")
     print(f"Chi2={chi2:.3f}, p{format_p(p)}")
     print()
@@ -310,59 +336,63 @@ def stats():
 
 stats()
 
+# =======================================================================
+# Latent variable =======================================================
+# =======================================================================
 
-def data_for_latent_variable_plot(
-        param, n_option, n_iteration,
-        prob_dist):
 
-    agent = RL(n_option=n_option, *param)
+def get_latent_variables(choices, successes, model, param):
 
-    choices = np.zeros(n_iteration, dtype=int)
-    successes = np.zeros(n_iteration, dtype=bool)
-    values = np.zeros((n_iteration, n_option))
-    p_choices = np.zeros((n_iteration, n_option))
+    agent = model(n_option=N, *param)
 
-    # Simulate the task
-    for t in range(n_iteration):
+    assert hasattr(agent, "values"), \
+        "Model instance needs to have 'values' attribute"
 
-        # Register choice
-        values[t] = agent.values
+    q_values = np.zeros((T, N))
+    p_choices = np.zeros((T, N))
 
-        # Get choice
+    # (Re-)Simulate the task
+    for t in range(T):
+
+        # Register values
+        q_values[t] = agent.values
+
+        # Register probablility of choices
         p_choices[t] = agent.decision_rule()
 
-        # Determine choice
-        choice = np.random.choice(np.arange(n_option), p=p_choices[t])
-
-        # Determine success
-        p_success = prob_dist[choice]
-        success = np.random.choice(
-            [0, 1],
-            p=[1 - p_success, p_success])
-
         # Make agent learn
-        agent.learn(option=choice, success=success)
+        agent.learn(option=choices[t],
+                    success=successes[t])
 
-        # Backup
-        choices[t] = choice
-        successes[t] = success
+    return q_values, p_choices
 
-    fig, axes = plt.subplots(nrows=4)
+
+def latent_variable_plot(q_values, p_choices, choices, axes=None):
+
+    if axes is None:
+        n_rows = 4
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5*n_rows))
+        show = True
+    else:
+        show = False
 
     # Plot values
     ax = axes[0]
 
-    lines = ax.plot(values)
-    ax.legend(lines, [f"option {i}" for i in range(n_option)])
+    lines = ax.plot(q_values)
+    ax.legend(lines, [f"option {i}" for i in range(N)])
     ax.set_title("Q-values")
     ax.set_xlabel("time")
     ax.set_ylabel("value")
+    ax.set_ylim(-0.02, 1.02)
 
     # Plot probablilities
     ax = axes[1]
 
-    lines = ax.plot(values)
-    ax.legend(lines, [f"option {i}" for i in range(n_option)])
+    lines = ax.plot(p_choices)
+    ax.legend(lines, [f"option {i}" for i in range(N)])
+
+    ax.set_ylim(-0.02, 1.02)
     ax.set_title("Probabilities")
     ax.set_xlabel("time")
     ax.set_ylabel("p")
@@ -371,22 +401,39 @@ def data_for_latent_variable_plot(
     ax = axes[2]
 
     scatter_binary_choices(ax=ax, y=choices, color="C0", label="")
+    ax.set_xlabel("time")
+    ax.set_ylabel("choice")
+    ax.set_title("Choices")
 
-    # plot choices
+    # Plot average
     ax = axes[3]
 
     curve_rolling_mean(ax=ax, y=choices, color="C0", label="")
 
-    ax.set_ylim(-0.02, 1.02)
+    ax.set_title("Choices (average)")
 
     ax.set_xlabel("time")
     ax.set_ylabel("choice")
 
-    return choices, successes
+    if show:
+        plt.tight_layout()
+        plt.show()
 
 
-# # %%
+Q_VALUES, P_CHOICES = get_latent_variables(
+        choices=HIST_CHOICES['RL'],
+        successes=HIST_SUCCESSES['RL'],
+        model=RL,
+        param=PARAM_RL
+    )
 
+latent_variable_plot(q_values=Q_VALUES, p_choices=P_CHOICES,
+                     choices=HIST_CHOICES['RL'])
+
+
+# ========================================================================
+# Parameter fitting
+# ========================================================================
 
 class BanditOptimizer:
 
@@ -452,8 +499,222 @@ class BanditOptimizer:
 
         return best_param, best_value
 
-# %%
 
+# ==========================================================================
+# Simulation with best-fit parameters
+# ==========================================================================
+
+
+def get_data_plot_comparison_best_fit():
+
+    # Get best fit parameters
+    opt = BanditOptimizer(
+        n_option=N,
+        choices=HIST_CHOICES['RL'],
+        successes=HIST_SUCCESSES['RL'],
+        model=RL,
+        bounds=RL.bounds
+    )
+
+    best_param, best_value = opt.run()
+
+    # Get latent variables for best_fit
+    q_values_bf_same_hist, p_choices_bf_same_hist = \
+        get_latent_variables(
+            model=RL,
+            choices=HIST_CHOICES['RL'],
+            successes=HIST_SUCCESSES['RL'],
+            param=best_param
+        )
+
+    # Run new simulation with best param
+    choices_new, successes_new = \
+        run_simulation(agent_model=RL,
+                       param=best_param,
+                       n_iteration=T,
+                       n_option=N,
+                       prob_dist=P)
+
+    q_values_new, p_choices_new = get_latent_variables(
+        model=RL,
+        choices=choices_new,
+        successes=successes_new,
+        param=best_param
+    )
+
+    return best_param, \
+        {
+            "q_values_bf_same_hist": q_values_bf_same_hist,
+            "p_choices_bf_same_hist": p_choices_bf_same_hist,
+            "choices_new": choices_new,
+            "q_values_new": q_values_new,
+            "p_choices_new": p_choices_new
+        }
+
+
+bkp_file = os.path.join(BKP_FOLDER, "comparison_best_fit.p")
+if not os.path.exists(bkp_file) or not USE_PICKLE_FIT:
+
+    best_param, data_comparison_best_fit = \
+        get_data_plot_comparison_best_fit()
+    pickle.dump(
+        (best_param, data_comparison_best_fit), open(bkp_file, 'wb'))
+
+else:
+    best_param, data_comparison_best_fit = pickle.load(open(bkp_file, 'rb'))
+
+
+print(f"Best-fit parameters: {best_param}")
+
+
+def plot_comparison_best_fit(
+        q_values_bf_same_hist,
+        p_choices_bf_same_hist,
+        choices_new,
+        q_values_new,
+        p_choices_new
+):
+
+    n_cols = 3
+    n_rows = 4
+    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
+                             figsize=(4*n_cols,  2.5*n_rows))
+
+    titles = {
+        "Initial": axes[0, 0],
+        "Best-fit - Same hist.": axes[0, 1],
+        "Best-fit - NEW hist.": axes[0, 2]
+    }
+    for title, ax in titles.items():
+        ax.text(0.5, 1.2, title,
+                horizontalalignment='center',
+                transform=ax.transAxes,
+                size=15, weight='bold')
+
+    # Here for comparison
+    latent_variable_plot(
+        q_values=Q_VALUES, p_choices=P_CHOICES,
+        choices=HIST_CHOICES['RL'],
+        axes=axes[:, 0])
+
+    # Same history but best fit parameters
+    latent_variable_plot(
+        q_values=q_values_bf_same_hist,
+        p_choices=p_choices_bf_same_hist,
+        choices=HIST_CHOICES['RL'],
+        axes=axes[:, 1])
+
+    # New simulation with best fit parameters
+    latent_variable_plot(
+        q_values=q_values_new,
+        p_choices=p_choices_new,
+        choices=choices_new,
+        axes=axes[:, 2])
+
+    plt.tight_layout()
+    plt.show()
+
+    # Full simulation with best fit parameters
+
+
+plot_comparison_best_fit(**data_comparison_best_fit)
+
+
+# =========================================================================
+# Local minima exploration ================================================
+# =========================================================================
+
+# Local minima: Get data --------------------------------------------------
+
+def local_minima(model, choices, successes, grid_size=20):
+
+    assert len(model.param_labels) == 2
+
+    ll = np.zeros((grid_size, grid_size))
+
+    opt = BanditOptimizer(
+        n_option=N,
+        choices=choices,
+        successes=successes,
+        model=model,
+        bounds=model.bounds
+    )
+
+    param0_grid = np.linspace(*model.bounds[0], grid_size)
+    param1_grid = np.linspace(*model.bounds[1], grid_size)
+
+    for i in tqdm(range(len(param0_grid))):
+        for j in range(len(param1_grid)):
+
+            param_to_use = (param0_grid[i], param1_grid[j])
+
+            ll_obs = - opt.objective(param=param_to_use)
+            ll[j, i] = ll_obs
+
+    x, y, z = param0_grid, param1_grid, ll
+
+    return x, y, z
+
+
+bkp_file = os.path.join(BKP_FOLDER, "local_minima.p")
+
+if not os.path.exists(bkp_file) or not USE_PICKLE_LOCAL_MINIMA:
+
+    data_local_minima = local_minima(
+        model=RL,
+        choices=HIST_CHOICES['RL'],
+        successes=HIST_SUCCESSES['RL'])
+    pickle.dump(data_local_minima, open(bkp_file, 'wb'))
+
+else:
+    data_local_minima = pickle.load(open(bkp_file, 'rb'))
+
+
+# Local minima: Plot --------------------------------------------------------
+
+def phase_diagram(
+        data,
+        labels,
+        n_levels=100,
+        title=None):
+
+    x, y, z = data
+    x_label, y_label = labels
+
+    fig, ax = plt.subplots(figsize=(5, 5))
+
+    # Axes labels
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # Title
+    ax.set_title(title)
+
+    x_coordinates, y_coordinates = np.meshgrid(x, y)
+
+    c = ax.contourf(x_coordinates, y_coordinates, z,
+                    levels=n_levels, cmap='viridis')
+
+    divider = make_axes_locatable(ax)
+
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+
+    cbar = plt.colorbar(c, cax=cax)
+    cbar.ax.set_ylabel('Log likelihood')
+
+    ax.set_aspect(1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+phase_diagram(data_local_minima, labels=RL.param_labels,
+              title='Local minima exploration')
+
+
+# ==========================================================================
+# PARAMETER RECOVERY =======================================================
+# ==========================================================================
 
 def param_recovery(model, n_sets=30):
 
@@ -499,14 +760,9 @@ def param_recovery(model, n_sets=30):
     return param
 
 
-# %%
-
-BKP_FOLDER = "bkp"
-os.makedirs(BKP_FOLDER, exist_ok=True)
 bkp_file = os.path.join(BKP_FOLDER, "param_recovery.p")
-force = False
 
-if not os.path.exists(bkp_file) or force:
+if not os.path.exists(bkp_file) or not USE_PICKLE_PARAM_RECOVERY:
     param_rcv = param_recovery(RL)
     pickle.dump(param_rcv, open(bkp_file, 'wb'))
 
@@ -514,101 +770,16 @@ else:
     param_rcv = pickle.load(open(bkp_file, 'rb'))
 
 
-# %%
+# Parameter recovery: Plot -------------------------------------------------
 
-
-def phase_diagram(
-        data,
-        labels,
-        n_levels=100,
-        fontsize=10,
-        title=None):
-
-    x, y, z = data
-    x_label, y_label = labels
-
-    fig, ax = plt.subplots(figsize=(8, 8))
-
-    # Axes labels
-    ax.set_xlabel(x_label, fontsize=fontsize * 1.5)
-    ax.set_ylabel(y_label, fontsize=fontsize * 1.5)
-
-    # Title
-    ax.set_title(title)
-
-    X, Y = np.meshgrid(x, y)
-
-    c = ax.contourf(X, Y, z, levels=n_levels, cmap='viridis')
-
-    divider = make_axes_locatable(ax)
-
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-
-    cbar = plt.colorbar(c, cax=cax)
-    cbar.ax.set_ylabel('Log likelihood')
-
-    ax.set_aspect(1)
-
-    plt.show()
-
-
-def local_minima(model, choices, successes, grid_size=20):
-
-    assert len(model.param_labels) == 2
-
-    ll = np.zeros((grid_size, grid_size))
-
-    opt = BanditOptimizer(
-        n_option=N,
-        choices=choices,
-        successes=successes,
-        model=model,
-        bounds=model.bounds
-    )
-
-    param0_grid = np.linspace(*model.bounds[0], grid_size)
-    param1_grid = np.linspace(*model.bounds[1], grid_size)
-
-    for i in tqdm(range(len(param0_grid))):
-        for j in range(len(param1_grid)):
-
-            param_to_use = (param0_grid[i], param1_grid[j])
-
-            ll_obs = - opt.objective(param=param_to_use)
-            ll[j, i] = ll_obs
-
-    x, y, z = param0_grid, param1_grid, ll
-
-    return x, y, z
-
-
-bkp_file = os.path.join(BKP_FOLDER, "local_minima.p")
-
-if not os.path.exists(bkp_file) or force:
-
-    data_local_minima = local_minima(
-        model=RL,
-        choices=hist_choices['RL'],
-        successes=hist_successes['RL'])
-    pickle.dump(data_local_minima, open(bkp_file, 'wb'))
-
-else:
-    data_local_minima = pickle.load(open(bkp_file, 'rb'))
-
-phase_diagram(data_local_minima, labels=RL.param_labels)
-# confusion_matrix(data=data_local_minima[-1],
-#                  x_labels=data_local_minima[0],
-#                  y_labels=data_local_minima[1])
-
-
-def scatter(data):
+def scatter(data, x_label=None, y_label=None):
 
     keys = sorted(data.keys())
     n_keys = len(keys)
     colors = [f'C{i}' for i in range(n_keys)]
 
     # Create fig
-    fig, axes = plt.subplots(ncols=n_keys, figsize=(5, 10))
+    fig, axes = plt.subplots(ncols=n_keys, figsize=(3*n_keys, 3))
 
     for i in range(n_keys):
         ax = axes[i]
@@ -619,6 +790,9 @@ def scatter(data):
         x, y = data[k]
 
         ax.scatter(x, y, alpha=0.5, color=colors[i])
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
 
         ax.set_title(title)
         ax.set_xticks((0, 0.5, 1))
@@ -632,12 +806,10 @@ def scatter(data):
     plt.show()
 
 
-# %%
+scatter(param_rcv, x_label='Simulated', y_label='Recovered')
 
-scatter(param_rcv)
 
-# %%
-
+# Parameter recovery: Stats -------------------------------------------------
 
 def correlation_recovery(data):
 
@@ -654,116 +826,49 @@ def correlation_recovery(data):
     print()
 
 
-# %%
-
 correlation_recovery(param_rcv)
 
-# %%
 
+# ===========================================================================
+# BIC
+# ===========================================================================
 
 def bic(ll, k, n_iteration):
     return -2 * ll + k * np.log(n_iteration)
 
 
 def compute_bic_scores():
-    opt = BanditOptimizer(
-        n_option=N,
-        choices=hist_choices['RL'],
-        successes=hist_successes['RL'],
-        model=RL,
-        bounds=RL.bounds
-    )
 
-    best_param, best_value = opt.run()
+    choices = HIST_CHOICES['RL']
+    successes = HIST_SUCCESSES['RL']
 
-    ll = -best_value
+    for m in MODELS:
 
-    bic_score = bic(ll, len(RL.bounds), n_iteration=T)
+        opt = BanditOptimizer(
+            n_option=N,
+            choices=choices,
+            successes=successes,
+            model=m,
+            bounds=m.bounds
+        )
 
-    print(f"BIC RL REVOVERED={bic_score:.3f}")
+        best_param, best_value = opt.run()
 
-    print(best_param, ll)
+        ll = -best_value
 
-    opt = BanditOptimizer(
-        n_option=N,
-        choices=hist_choices['RL'],
-        successes=hist_successes['RL'],
-        model=Random,
-        bounds=None
-    )
+        bic_score = bic(ll, len(m.bounds), n_iteration=T)
 
-    ll = - opt.objective(param=None)
-
-    bic_score = bic(ll, 0, n_iteration=T)
-
-    print(f"BIC Random={bic_score:.3f}")
+        print(f"BIC {m.__name__} ={bic_score:.3f}")
 
 
 compute_bic_scores()
 
 
-def confusion_matrix_plot(data,
-                          x_label, y_label,
-                          x_labels=None, y_labels=None, title=None):
+# ============================================================================
+# Confusion matrix ===========================================================
+# ============================================================================
 
-    if x_labels is None:
-        x_labels = np.arange(data.shape[1])
-    if y_labels is None:
-        y_labels = np.arange(data.shape[0])
-
-    fig, ax = plt.subplots(figsize=(8, 8))
-    im = ax.imshow(data, alpha=0.5)
-
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-
-    # We want to show all ticks...
-    ax.set_xticks(np.arange(len(x_labels)))
-    ax.set_yticks(np.arange(len(y_labels)))
-    # ... and label them with the respective list entries
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
-
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-             rotation_mode="anchor")
-
-    # ... and move them again
-    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
-    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
-    ax.tick_params(which="minor", bottom=False, left=False)
-
-    # Loop over data dimensions and create text annotations.
-    for i in range(len(y_labels)):
-        for j in range(len(x_labels)):
-            ax.text(j, i, f'{data[i, j]:.3f}',
-                    ha="center", va="center", color="black")
-    # divider = make_axes_locatable(ax)
-    # cax = divider.append_axes("right", size="5%", pad=0.05)
-
-    # norm = matplotlib.colors.Normalize(vmin=0, vmax=vmax)
-
-    # import matplotlib as mpl
-
-    # cbar = fig.colorbar(im) #, cax=cax)  # , ticks=y_ticks)
-    # cbar.ax.set_ylabel('Log likelihood')
-
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-
-    # norm = matplotlib.colors.Normalize(vmin=0, vmax=vmax)
-
-    # import matplotlib as mpl
-
-    cbar = plt.colorbar(im, cax=cax)  # , ticks=y_ticks)
-    # cbar.ax.set_ylabel('Log likelihood')
-
-    if title is not None:
-        ax.set_title(title)
-
-    fig.tight_layout()
-    plt.show()
-
+# Confusion matrix: Get data -------------------------------------------------
 
 def data_for_confusion_matrix(models, n_sets=10):
 
@@ -822,9 +927,9 @@ def data_for_confusion_matrix(models, n_sets=10):
 
 
 bkp_file = os.path.join(BKP_FOLDER, "conf_mt.p")
-force = False
 
-if not os.path.exists(bkp_file) or force:
+
+if not os.path.exists(bkp_file) or not USE_PICKLE_CONFUSION_MATRIX:
     conf_mt = data_for_confusion_matrix(models=MODELS)
     pickle.dump(conf_mt, open(bkp_file, 'wb'))
 
@@ -832,6 +937,61 @@ else:
     conf_mt = pickle.load(open(bkp_file, 'rb'))
 
 
-labels = [m.__name__ for m in MODELS]
+# Confusion matrix: Plot -----------------------------------------------------
+
+def confusion_matrix_plot(
+        data,
+        x_label, y_label,
+        x_labels=None, y_labels=None, title="Confusion matrix"):
+
+    if x_labels is None:
+        x_labels = np.arange(data.shape[1])
+    if y_labels is None:
+        y_labels = np.arange(data.shape[0])
+
+    fig, ax = plt.subplots(figsize=(2.5*data.shape[1],
+                                    2.5*data.shape[0]))
+    im = ax.imshow(data, alpha=0.5)
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(x_labels)))
+    ax.set_yticks(np.arange(len(y_labels)))
+    # ... and label them with the respective list entries
+    ax.set_xticklabels(x_labels)
+    ax.set_yticklabels(y_labels)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # ... and move them again
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(y_labels)):
+        for j in range(len(x_labels)):
+            ax.text(j, i, f'{data[i, j]:.3f}',
+                    ha="center", va="center", color="black")
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+
+    plt.colorbar(im, cax=cax)
+
+    if title is not None:
+        ax.set_title(title)
+
+    fig.tight_layout()
+    plt.show()
+
+
+confusion_matrix_labels = [m.__name__ for m in MODELS]
 confusion_matrix_plot(data=conf_mt, x_label="simulated model",
-                      y_label="fit model", x_labels=labels, y_labels=labels)
+                      y_label="fit model",
+                      x_labels=confusion_matrix_labels,
+                      y_labels=confusion_matrix_labels)
