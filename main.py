@@ -336,10 +336,10 @@ def stats():
 
 stats()
 
+
 # =======================================================================
 # Latent variable =======================================================
 # =======================================================================
-
 
 def get_latent_variables(choices, successes, model, param):
 
@@ -367,7 +367,10 @@ def get_latent_variables(choices, successes, model, param):
     return q_values, p_choices
 
 
-def latent_variable_plot(q_values, p_choices, choices, axes=None):
+def latent_variable_plot(q_values, p_choices, choices,
+                         q_values_std=None, p_choices_std=None,
+                         choices_std=None,
+                         axes=None):
 
     if axes is None:
         n_rows = 4
@@ -380,6 +383,13 @@ def latent_variable_plot(q_values, p_choices, choices, axes=None):
     ax = axes[0]
 
     lines = ax.plot(q_values)
+
+    if q_values_std is not None:
+        ax.fill_between(
+            q_values - q_values_std,
+            q_values + q_values_std
+        )
+
     ax.legend(lines, [f"option {i}" for i in range(N)])
     ax.set_title("Q-values")
     ax.set_xlabel("time")
@@ -390,6 +400,13 @@ def latent_variable_plot(q_values, p_choices, choices, axes=None):
     ax = axes[1]
 
     lines = ax.plot(p_choices)
+
+    if p_choices is not None:
+        ax.fill_between(
+            p_choices - p_choices_std,
+            p_choices + p_choices_std
+        )
+
     ax.legend(lines, [f"option {i}" for i in range(N)])
 
     ax.set_ylim(-0.02, 1.02)
@@ -431,6 +448,117 @@ latent_variable_plot(q_values=Q_VALUES, p_choices=P_CHOICES,
                      choices=HIST_CHOICES['RL'])
 
 
+# ========================================================================
+# Population simulation
+# ========================================================================
+
+def population_simulation(model, param, n=30):
+
+    pop_choices = np.zeros((n, T, N))
+    pop_q_values = np.zeros((n, T, N))
+    pop_p_choices = np.zeros((n, T, N))
+
+    for i in range(n):
+
+        choices, successes \
+            = run_simulation(
+                agent_model=model, param=param,
+                n_iteration=T, n_option=N, prob_dist=P)
+
+        q_values, p_choices \
+            = get_latent_variables(
+                choices=choices, successes=successes,
+                model=model,
+                param=param)
+
+        pop_choices[i] = choices
+        pop_q_values[i] = q_values
+        pop_p_choices[i] = p_choices
+
+    return pop_choices, pop_q_values, pop_p_choices
+
+
+def plot_mean_std(ax, y):
+
+    mean = np.mean(y, axis=0)
+    std = np.std(y, axis=0)
+    lines = ax.plot(mean)
+    ax.fill_between(
+        mean - std,
+        mean + std,
+        alpha=0.2
+    )
+    return lines
+
+
+def pop_latent_variable_plot(
+        q_values, p_choices, choices, axes=None):
+
+    if axes is None:
+        n_rows = 3
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
+        show = True
+    else:
+        show = False
+
+    # Plot values
+    ax = axes[0]
+    lines = plot_mean_std(ax=ax, y=q_values)
+    ax.legend(lines, [f"option {i}" for i in range(N)])
+    ax.set_title("Q-values")
+    ax.set_xlabel("time")
+    ax.set_ylabel("value")
+    ax.set_ylim(-0.02, 1.02)
+
+    # # Plot probablilities
+    # ax = axes[1]
+    #
+    # lines = ax.plot(p_choices)
+    #
+    # if p_choices is not None:
+    #     ax.fill_between(
+    #         p_choices - p_choices_std,
+    #         p_choices + p_choices_std
+    #     )
+    #
+    # ax.legend(lines, [f"option {i}" for i in range(N)])
+    #
+    # ax.set_ylim(-0.02, 1.02)
+    # ax.set_title("Probabilities")
+    # ax.set_xlabel("time")
+    # ax.set_ylabel("p")
+    #
+    # # Plot scatter
+    # ax = axes[2]
+    #
+    # scatter_binary_choices(ax=ax, y=choices, color="C0", label="")
+    # ax.set_xlabel("time")
+    # ax.set_ylabel("choice")
+    # ax.set_title("Choices")
+    #
+    # # Plot average
+    # ax = axes[3]
+    #
+    # curve_rolling_mean(ax=ax, y=choices, color="C0", label="")
+    #
+    # ax.set_title("Choices (average)")
+    #
+    # ax.set_xlabel("time")
+    # ax.set_ylabel("choice")
+
+    if show:
+        plt.tight_layout()
+        plt.show()
+
+
+def pop_analysis():
+    pop_choices, pop_q_values, pop_p_choices = \
+        population_simulation(model=RL, param=PARAM_RL)
+    pop_latent_variable_plot(q_values=pop_q_values,
+                             choices=pop_choices,
+                             p_choices=pop_p_choices)
+
+# pop_analysis()
 # ========================================================================
 # Parameter fitting
 # ========================================================================
