@@ -1,3 +1,8 @@
+"""
+Modeling of decision-making
+"""
+
+
 # %% md
 
 # 0. Import the necessary libraries
@@ -84,6 +89,60 @@ class RL(Random):
 
 # %% md
 
+
+def plot_learning_parameter():
+
+    param_values = (0.1, 0.25, 0.5)
+    n_iteration = 100
+
+    n_param_values = len(param_values)
+
+    values = np.zeros((n_iteration, n_param_values))
+
+    for i in range(n_param_values):
+        alpha = param_values[i]
+        agent = RL(learning_rate=alpha,
+                   temp=0.0, n_option=1)
+        for t in range(n_iteration):
+
+            values[t, i] = agent.values[0]
+            agent.learn(option=0, success=1)
+
+    fig, ax = plt.subplots()
+    lines = ax.plot(values)
+
+    ax.set_xlabel("time")
+    ax.set_ylabel("value")
+
+    ax.legend(lines, [r"\alpha=" + f'{v}' for v in param_values])
+
+    plt.plot()
+
+
+def plot_temperature():
+
+    param_values = (0.05, 0.5, 1)
+
+    x_values = np.linspace(-1, 1, 100)
+
+    n_param_values = len(param_values)
+
+    values = np.zeros((len(x_values), n_param_values))
+
+    for i in range(n_param_values):
+        alpha = param_values[i]
+
+
+    fig, ax = plt.subplots()
+    ax.plot(values)
+
+    ax.set_xlabel("Q(A) - Q(B)")
+    ax.set_ylabel("p(A)")
+
+    plt.plot()
+
+
+
 # 3. Simulate
 
 # %%
@@ -137,18 +196,42 @@ hist_successes = {}
 for idx_model in range(n_models):
     _m = MODELS[idx_model]
 
-    c, s = run_simulation(
-        agent_model=_m, param=params[idx_model],
-        n_iteration=T, n_option=N, prob_dist=P)
-
-    hist_choices[_m.__name__] = c
-    hist_successes[_m.__name__] = s
+    hist_choices[_m.__name__], hist_successes[_m.__name__] \
+        = run_simulation(
+            agent_model=_m, param=params[idx_model],
+            n_iteration=T, n_option=N, prob_dist=P)
 
 
 # # %%
 
+def scatter_binary_choices(ax, y, color, label):
 
-def basic_scatter(data, y_label="choice", x_label="time"):
+    ax.scatter(range(len(y)), y, color=color,
+               alpha=0.2, label=label)
+
+    ax.set_ylim(-0.02, 1.02)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+
+def curve_rolling_mean(ax, y, color, label, window=50):
+
+    d = pd.Series(y).rolling(window)
+    means = d.mean()
+    ax.plot(means, color=color, label=label)
+
+    sd = d.std()
+    y1 = means + sd
+    y2 = means - sd
+    ax.fill_between(
+        range(len(means)),
+        y1=y1,
+        y2=y2,
+        alpha=0.2,
+        color=color
+    )
+
+
+def multi_plot(data, func, x_label="time", y_label="choice"):
 
     keys = sorted(data.keys())
     n_keys = len(keys)
@@ -158,15 +241,14 @@ def basic_scatter(data, y_label="choice", x_label="time"):
     colors = [f'C{i}' for i in range(n_keys)]
 
     for i in range(n_keys):
+
         k = keys[i]
+        ax = axes[i]
+        color = colors[i]
+
         y = data[k]
 
-        ax = axes[i]
-        ax.scatter(range(len(y)), y, color=colors[i],
-                   alpha=0.2, label=k)
-
-        ax.set_ylim(-0.02, 1.02)
-        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        func(ax=ax, y=y, color=color, label=k)
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
@@ -176,54 +258,11 @@ def basic_scatter(data, y_label="choice", x_label="time"):
     plt.show()
 
 
-basic_scatter(data=hist_choices)
+# Basic scatterplot
+multi_plot(data=hist_choices, func=scatter_binary_choices)
 
-# %%
-
-
-def running_mean(data, y_label='choice', x_label="time", window=50):
-
-    keys = sorted(data.keys())
-    n_keys = len(keys)
-
-    fig, axes = plt.subplots(ncols=n_keys)
-
-    colors = [f'C{i}' for i in range(n_keys)]
-
-    for i in range(n_keys):
-        k = keys[i]
-
-        y = data[k]
-
-        ax = axes[i]
-
-        d = pd.Series(y).rolling(window)
-        means = d.mean()
-        ax.plot(means,
-                color=colors[i], label=k)
-
-        sd = d.std()
-        y1 = means + sd
-        y2 = means - sd
-        ax.fill_between(
-            range(len(means)),
-            y1=y1,
-            y2=y2,
-            alpha=0.2,
-            color=colors[i]
-        )
-
-        ax.set_ylim(-0.02, 1.02)
-
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-
-        ax.legend()
-    plt.tight_layout()
-    plt.show()
-
-
-running_mean(data=hist_choices)
+# Running mean
+multi_plot(data=hist_choices, func=curve_rolling_mean)
 #
 # # %%
 
@@ -270,6 +309,80 @@ def stats():
 
 
 stats()
+
+
+def data_for_latent_variable_plot(
+        param, n_option, n_iteration,
+        prob_dist):
+
+    agent = RL(n_option=n_option, *param)
+
+    choices = np.zeros(n_iteration, dtype=int)
+    successes = np.zeros(n_iteration, dtype=bool)
+    values = np.zeros((n_iteration, n_option))
+    p_choices = np.zeros((n_iteration, n_option))
+
+    # Simulate the task
+    for t in range(n_iteration):
+
+        # Register choice
+        values[t] = agent.values
+
+        # Get choice
+        p_choices[t] = agent.decision_rule()
+
+        # Determine choice
+        choice = np.random.choice(np.arange(n_option), p=p_choices[t])
+
+        # Determine success
+        p_success = prob_dist[choice]
+        success = np.random.choice(
+            [0, 1],
+            p=[1 - p_success, p_success])
+
+        # Make agent learn
+        agent.learn(option=choice, success=success)
+
+        # Backup
+        choices[t] = choice
+        successes[t] = success
+
+    fig, axes = plt.subplots(nrows=4)
+
+    # Plot values
+    ax = axes[0]
+
+    lines = ax.plot(values)
+    ax.legend(lines, [f"option {i}" for i in range(n_option)])
+    ax.set_title("Q-values")
+    ax.set_xlabel("time")
+    ax.set_ylabel("value")
+
+    # Plot probablilities
+    ax = axes[1]
+
+    lines = ax.plot(values)
+    ax.legend(lines, [f"option {i}" for i in range(n_option)])
+    ax.set_title("Probabilities")
+    ax.set_xlabel("time")
+    ax.set_ylabel("p")
+
+    # Plot scatter
+    ax = axes[2]
+
+    scatter_binary_choices(ax=ax, y=choices, color="C0", label="")
+
+    # plot choices
+    ax = axes[3]
+
+    curve_rolling_mean(ax=ax, y=choices, color="C0", label="")
+
+    ax.set_ylim(-0.02, 1.02)
+
+    ax.set_xlabel("time")
+    ax.set_ylabel("choice")
+
+    return choices, successes
 
 
 # # %%
@@ -425,19 +538,13 @@ def phase_diagram(
 
     X, Y = np.meshgrid(x, y)
 
-    c = ax.contourf(
-        X, Y, z,
-        levels=n_levels, cmap='viridis')  # , vmax=vmax)
+    c = ax.contourf(X, Y, z, levels=n_levels, cmap='viridis')
 
     divider = make_axes_locatable(ax)
 
     cax = divider.append_axes("right", size="5%", pad=0.05)
 
-    # norm = matplotlib.colors.Normalize(vmin=0, vmax=vmax)
-
-    # import matplotlib as mpl
-
-    cbar = plt.colorbar(c, cax=cax)  # , ticks=y_ticks)
+    cbar = plt.colorbar(c, cax=cax)
     cbar.ax.set_ylabel('Log likelihood')
 
     ax.set_aspect(1)
