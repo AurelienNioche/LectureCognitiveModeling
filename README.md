@@ -16,8 +16,8 @@ Material for the class
 
 2.1 Individual
 
-* Plot: basic (pure description)
-* Plot: more advanced (can include stats)
+* Plot: purely descriptive
+* Plot: maximizing readability
 
 2.2 Latent variables
 
@@ -30,7 +30,13 @@ Material for the class
 
 # 2. Parameter recovery [RL only]
 
+3.0 Exploration of objective function values over parameter space
+
+* Plot: objective function values over parameter space (phase diagram)
+
 3.1 Individual
+
+* Plot: Initial results + Best fit same hist + Best fit new history 
 
 3.2 Population
 
