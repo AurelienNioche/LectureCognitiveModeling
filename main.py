@@ -367,10 +367,7 @@ def get_latent_variables(choices, successes, model, param):
     return q_values, p_choices
 
 
-def latent_variable_plot(q_values, p_choices, choices,
-                         q_values_std=None, p_choices_std=None,
-                         choices_std=None,
-                         axes=None):
+def latent_variable_plot(q_values, p_choices, choices, axes=None):
 
     if axes is None:
         n_rows = 4
@@ -384,12 +381,6 @@ def latent_variable_plot(q_values, p_choices, choices,
 
     lines = ax.plot(q_values)
 
-    if q_values_std is not None:
-        ax.fill_between(
-            q_values - q_values_std,
-            q_values + q_values_std
-        )
-
     ax.legend(lines, [f"option {i}" for i in range(N)])
     ax.set_title("Q-values")
     ax.set_xlabel("time")
@@ -400,12 +391,6 @@ def latent_variable_plot(q_values, p_choices, choices,
     ax = axes[1]
 
     lines = ax.plot(p_choices)
-
-    if p_choices is not None:
-        ax.fill_between(
-            p_choices - p_choices_std,
-            p_choices + p_choices_std
-        )
 
     ax.legend(lines, [f"option {i}" for i in range(N)])
 
@@ -454,7 +439,7 @@ latent_variable_plot(q_values=Q_VALUES, p_choices=P_CHOICES,
 
 def population_simulation(model, param, n=30):
 
-    pop_choices = np.zeros((n, T, N))
+    pop_choices = np.zeros((n, T))
     pop_q_values = np.zeros((n, T, N))
     pop_p_choices = np.zeros((n, T, N))
 
@@ -478,17 +463,17 @@ def population_simulation(model, param, n=30):
     return pop_choices, pop_q_values, pop_p_choices
 
 
-def plot_mean_std(ax, y):
+def plot_mean_std(ax, y, label):
 
     mean = np.mean(y, axis=0)
     std = np.std(y, axis=0)
-    lines = ax.plot(mean)
+    ax.plot(mean, label=label)
     ax.fill_between(
+        range(T),
         mean - std,
         mean + std,
         alpha=0.2
     )
-    return lines
 
 
 def pop_latent_variable_plot(
@@ -503,48 +488,48 @@ def pop_latent_variable_plot(
 
     # Plot values
     ax = axes[0]
-    lines = plot_mean_std(ax=ax, y=q_values)
-    ax.legend(lines, [f"option {i}" for i in range(N)])
+
+    assert q_values.shape[-1] == N
+
+    for i in range(N):
+
+        label = f"option {i}"
+        y = q_values[:, :, i]
+
+        plot_mean_std(ax=ax, y=y, label=label)
+
+    ax.legend()
     ax.set_title("Q-values")
     ax.set_xlabel("time")
     ax.set_ylabel("value")
     ax.set_ylim(-0.02, 1.02)
 
-    # # Plot probablilities
-    # ax = axes[1]
-    #
-    # lines = ax.plot(p_choices)
-    #
-    # if p_choices is not None:
-    #     ax.fill_between(
-    #         p_choices - p_choices_std,
-    #         p_choices + p_choices_std
-    #     )
-    #
-    # ax.legend(lines, [f"option {i}" for i in range(N)])
-    #
-    # ax.set_ylim(-0.02, 1.02)
-    # ax.set_title("Probabilities")
-    # ax.set_xlabel("time")
-    # ax.set_ylabel("p")
-    #
-    # # Plot scatter
-    # ax = axes[2]
-    #
-    # scatter_binary_choices(ax=ax, y=choices, color="C0", label="")
-    # ax.set_xlabel("time")
-    # ax.set_ylabel("choice")
-    # ax.set_title("Choices")
-    #
-    # # Plot average
-    # ax = axes[3]
-    #
-    # curve_rolling_mean(ax=ax, y=choices, color="C0", label="")
-    #
-    # ax.set_title("Choices (average)")
-    #
-    # ax.set_xlabel("time")
-    # ax.set_ylabel("choice")
+    # Plot probablilities
+    ax = axes[1]
+
+    for i in range(N):
+
+        label = f"option {i}"
+        y = p_choices[:, :, i]
+
+        plot_mean_std(ax=ax, y=y, label=label)
+
+    ax.legend()
+
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_title("Probabilities")
+    ax.set_xlabel("time")
+    ax.set_ylabel("p")
+
+    # Plot average
+    ax = axes[2]
+
+    plot_mean_std(ax=ax, y=choices, label=None)
+
+    ax.set_title("Choices (average)")
+
+    ax.set_xlabel("time")
+    ax.set_ylabel("choice")
 
     if show:
         plt.tight_layout()
@@ -558,7 +543,9 @@ def pop_analysis():
                              choices=pop_choices,
                              p_choices=pop_p_choices)
 
-# pop_analysis()
+pop_analysis()
+
+
 # ========================================================================
 # Parameter fitting
 # ========================================================================
