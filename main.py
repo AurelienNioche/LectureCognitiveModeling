@@ -40,7 +40,7 @@ T = 500
 
 class Random:
     """
-    No-learning model
+    Random selection
     """
     param_labels = ()
     fit_bounds = ()
@@ -63,9 +63,52 @@ class Random:
         pass
 
 
-class RescolaWagner(Random):
+class WSLS(Random):
+
     """
-    Reinforcement learning model
+    Win-Stay-Lose-Switch
+    """
+
+    param_labels = ("epsilon", )
+    fit_bounds = (0., 1),
+    xp_bounds = (0.25, 0.75),
+
+    def __init__(self, epsilon):
+        super().__init__()
+        self.epsilon = epsilon
+
+        self.c = -1
+        self.r = -1
+
+    def decision_rule(self):
+
+        if self.c == -1:
+            return np.ones(N) / N  # First turn
+
+        p = np.zeros(N)
+
+        # 1 - epsilon: select the same
+        # epsilon: choose randomly
+        # ...so p apply rule
+        p_apply_rule = 1 - self.epsilon
+        p_random = self.epsilon / N
+        if self.r:
+            p[self.c] = p_apply_rule + p_random
+            p[self.options != self.c] = p_random
+        else:
+            p[self.options != self.c] = p_apply_rule + p_random
+            p[self.c] = p_random
+
+        return p
+
+    def updating_rule(self, option, success):
+        self.r = success
+        self.c = option
+
+
+class RW(Random):
+    """
+    Rescola-Wagner
     """
     param_labels = ("alpha", "beta")
     fit_bounds = (0.01, 1), (0.05, 1)
@@ -88,7 +131,11 @@ class RescolaWagner(Random):
             self.q_learning_rate * (success - self.q_values[option])
 
 
-class RescolaWagnerChoiceKernel(RescolaWagner):
+class RWCK(RW):
+
+    """
+    Rescola-Wagner / Choice-Kernel
+    """
 
     param_labels = ("alpha", "beta", "alpha_c", "beta_c")
     fit_bounds = (0.01, 1), (0.05, 1), (0.01, 1), (0.05, 1)
@@ -124,7 +171,7 @@ class RescolaWagnerChoiceKernel(RescolaWagner):
         super().updating_rule(option=option, success=success)
 
 
-MODELS = Random, RescolaWagner, RescolaWagnerChoiceKernel
+MODELS = Random, WSLS, RW, RWCK
 
 # Study the effect of your parameters ========================================
 
@@ -138,8 +185,8 @@ def plot_learning_parameter(n_iteration=100,
 
     for i in range(n_param_values):
         alpha = param_values[i]
-        agent = RescolaWagner(q_learning_rate=alpha,
-                              q_temp=None)
+        agent = RW(q_learning_rate=alpha,
+                   q_temp=None)
         for t in range(n_iteration):
 
             values[t, i] = agent.q_values[0]
@@ -199,17 +246,6 @@ SEED = 0
 PARAM_RL = (0.1, 0.1)
 
 
-# class UsePickle(object):
-#
-#     def __init__(self, f):
-#         print("inside my_decorator.__init__()")
-#         self.f = f
-#
-#     def __call__(self, *args, **kwargs):
-#         self.f(*args, **kwargs)
-#         print("inside my_decorator.__call__()")
-
-
 @use_pickle
 def run_simulation(seed, agent_model, param=()):
 
@@ -242,7 +278,7 @@ def run_simulation(seed, agent_model, param=()):
 
 
 CHOICES, SUCCESSES = \
-    run_simulation(agent_model=RescolaWagner, param=PARAM_RL, seed=SEED)
+    run_simulation(agent_model=RW, param=PARAM_RL, seed=SEED)
 
 
 # Plot ---------------------------------------------------------------------
@@ -288,7 +324,8 @@ def scatter_choices(ax, y,
     if scatter_labels is None:
         scatter_labels = [f'option {i}' for i in range(N)]
 
-    ax.scatter(range(len(y)), y, color=colors[y],
+    ax.scatter(range(len(y)), y+np.random.uniform(-0.2, 0.2, size=len(y)),
+               color=colors[y],
                alpha=0.2, s=10)
 
     for i, color in enumerate(colors):
@@ -297,7 +334,20 @@ def scatter_choices(ax, y,
                    s=20)
 
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    custom_ax(ax, y_label=y_label, title=title)
+
+    ax.set_xticks((0, int(T/2), T))
+    ax.set_yticks((0, 1))
+    ax.set_ylim(-0.5, 1.5)
+    ax.set_xlim(-0.02*T, T*1.02)
+    ax.set_xlabel("time")
+    ax.set_ylabel(y_label)
+    ax.set_aspect(50)
+
+    if title is not None:
+        ax.set_title(title)
+
+
+    ax.legend()
 
 
 def rolling_mean(y, window=50):
@@ -498,7 +548,7 @@ def plot_latent_variables(q_values, p_choices, choices, successes,
 Q_VALUES, P_CHOICES = data_latent_variables(
         choices=CHOICES,
         successes=SUCCESSES,
-        model=RescolaWagner,
+        model=RW,
         param=PARAM_RL
     )
 
@@ -597,7 +647,7 @@ def plot_pop_latent_variables(
 
 
 POP_Q_VALUES, POP_P_CHOICES, POP_CHOICES, POP_SUCCESSES = \
-    population_simulation(model=RescolaWagner, param=PARAM_RL)
+    population_simulation(model=RW, param=PARAM_RL)
 
 plot_pop_latent_variables(
     q_values=POP_Q_VALUES,
@@ -687,7 +737,7 @@ def get_best_param():
     opt = BanditOptimizer(
         choices=CHOICES,
         successes=SUCCESSES,
-        model=RescolaWagner
+        model=RW
     )
 
     best_param, best_value = opt.run()
@@ -701,31 +751,30 @@ print(f"Best-fit parameters: {BEST_PARAM}")
 @use_pickle
 def data_comparison_best_fit():
 
-    # Get latent variables for best_fit
-    q_values_bf_same_hist, p_choices_bf_same_hist = \
-        data_latent_variables(
-            model=RescolaWagner,
-            choices=CHOICES,
-            successes=SUCCESSES,
-            param=BEST_PARAM
-        )
+    # # Get latent variables for best_fit
+    # q_values_bf_same_hist, p_choices_bf_same_hist = \
+    #     data_latent_variables(
+    #         model=RW,
+    #         choices=CHOICES,
+    #         successes=SUCCESSES,
+    #         param=BEST_PARAM
+    #     )
 
     # Run new simulation with best param
     new_seed = SEED + 1
     choices_new, successes_new = \
         run_simulation(seed=new_seed,
-                       agent_model=RescolaWagner,
+                       agent_model=RW,
                        param=BEST_PARAM)
 
     q_values_new, p_choices_new = data_latent_variables(
-        model=RescolaWagner,
+        model=RW,
         choices=choices_new,
         successes=successes_new,
         param=BEST_PARAM
     )
 
-    return q_values_bf_same_hist, \
-        p_choices_bf_same_hist, \
+    return \
         q_values_new, \
         p_choices_new, \
         choices_new, \
@@ -733,23 +782,22 @@ def data_comparison_best_fit():
 
 
 def plot_comparison_best_fit(
-        q_values_bf_same_hist,
-        p_choices_bf_same_hist,
         q_values_new,
         p_choices_new,
         choices_new,
         successes_new
 ):
 
-    n_cols = 3
+    n_cols = 2
     n_rows = 6
     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
                              figsize=(4*n_cols,  2.5*n_rows))
 
     titles = {
         "Initial": axes[0, 0],
-        "Best-fit - Same hist.": axes[0, 1],
-        "Best-fit - NEW hist.": axes[0, 2]
+        "Best-fit": axes[0, 1]
+        # "Best-fit - Same hist.": axes[0, 1],
+        # "Best-fit - NEW hist.": axes[0, 2]
     }
     for title, ax in titles.items():
         ax.text(0.5, 1.2, title,
@@ -759,18 +807,19 @@ def plot_comparison_best_fit(
 
     # Here for comparison
     plot_latent_variables(
-        q_values=Q_VALUES, p_choices=P_CHOICES,
+        q_values=Q_VALUES,
+        p_choices=P_CHOICES,
         choices=CHOICES,
         successes=SUCCESSES,
         axes=axes[:, 0])
 
-    # Same history but best fit parameters
-    plot_latent_variables(
-        q_values=q_values_bf_same_hist,
-        p_choices=p_choices_bf_same_hist,
-        choices=CHOICES,
-        successes=SUCCESSES,
-        axes=axes[:, 1])
+    # # Same history but best fit parameters
+    # plot_latent_variables(
+    #     q_values=q_values_bf_same_hist,
+    #     p_choices=p_choices_bf_same_hist,
+    #     choices=CHOICES,
+    #     successes=SUCCESSES,
+    #     axes=axes[:, 1])
 
     # New simulation with best fit parameters
     plot_latent_variables(
@@ -778,7 +827,7 @@ def plot_comparison_best_fit(
         p_choices=p_choices_new,
         choices=choices_new,
         successes=successes_new,
-        axes=axes[:, 2])
+        axes=axes[:, 1])
 
     plt.tight_layout()
     plt.show()
@@ -793,11 +842,11 @@ def data_pop_comparison_best_fit():
 
     # Run simulations with INITIAL parameters
     data_init = \
-        population_simulation(model=RescolaWagner, param=PARAM_RL)
+        population_simulation(model=RW, param=PARAM_RL)
 
     # Run new simulation with BEST parameters
     data_best = \
-        population_simulation(model=RescolaWagner, param=BEST_PARAM)
+        population_simulation(model=RW, param=BEST_PARAM)
 
     return data_init, data_best
 
@@ -882,7 +931,7 @@ def data_local_minima(model, choices, successes, grid_size=20):
 
 
 local_minima = data_local_minima(
-    model=RescolaWagner,
+    model=RW,
     choices=CHOICES,
     successes=SUCCESSES)
 
@@ -926,7 +975,7 @@ def plot_local_minima(
 
 
 plot_local_minima(
-    local_minima, labels=RescolaWagner.param_labels,
+    local_minima, labels=RW.param_labels,
     title='Local minima exploration')
 
 
@@ -975,7 +1024,7 @@ def data_param_recovery(model, n_sets):
     return param
 
 
-param_rcv = data_param_recovery(model=RescolaWagner, n_sets=30)
+param_rcv = data_param_recovery(model=RW, n_sets=30)
 
 
 # Parameter recovery: Plot -------------------------------------------------
@@ -1052,6 +1101,8 @@ def compute_bic_scores(choices, successes):
 
     n_models = len(MODELS)
     bic_scores = np.zeros(n_models)
+    lls = np.zeros(n_models)
+    best_params = []
 
     for j in range(n_models):
         model_to_fit = MODELS[j]
@@ -1063,19 +1114,21 @@ def compute_bic_scores(choices, successes):
         )
 
         best_param, best_value = opt.run()
-
         ll = -best_value
 
         bs = bic(ll, k=len(model_to_fit.fit_bounds), n_iteration=T)
 
         bic_scores[j] = bs
+        lls[j] = ll
+        best_params.append(best_param)
 
-    return bic_scores
+    return best_params, lls, bic_scores
 
 
 def first_computation_bic():
 
-    bic_scores = compute_bic_scores(choices=CHOICES, successes=SUCCESSES)
+    best_params, lls, bic_scores = \
+        compute_bic_scores(choices=CHOICES, successes=SUCCESSES)
     for i, m in enumerate(MODELS):
 
         print(f"BIC {m.__name__} = {bic_scores[i]:.3f}")
@@ -1111,8 +1164,9 @@ def data_confusion_matrix(models, n_sets):
                     agent_model=model_to_simulate,
                     param=param_to_simulate)
 
-            bic_scores = compute_bic_scores(choices=sim_choices,
-                                            successes=sim_successes)
+            best_params, lls, bic_scores = compute_bic_scores(
+                choices=sim_choices,
+                successes=sim_successes)
 
             min_ = np.min(bic_scores)
 
@@ -1139,8 +1193,8 @@ def plot_confusion_matrix(data):
     x_tick_labels = confusion_matrix_labels
     y_tick_labels = confusion_matrix_labels
 
-    fig, ax = plt.subplots(figsize=(2.5*data.shape[1],
-                                    2.5*data.shape[0]))
+    fig, ax = plt.subplots(figsize=(2*data.shape[1],
+                                    2*data.shape[0]))
     im = ax.imshow(data, alpha=0.5)
 
     ax.set_xlabel(x_label)
@@ -1195,8 +1249,10 @@ def data_fake_xp(model, n_subjects):
     choices = np.zeros((n_subjects, T), dtype=int)
     successes = np.zeros((n_subjects, T), dtype=bool)
     bic_scores = np.zeros((n_subjects, len(MODELS)))
+    lls = np.zeros((n_subjects, len(MODELS)))
+    best_params = []
 
-    for i in range(n_subjects):
+    for i in tqdm(range(n_subjects)):
 
         param = [np.random.uniform(*b) for b in model.xp_bounds]
         c, s = run_simulation(seed=i,
@@ -1205,16 +1261,34 @@ def data_fake_xp(model, n_subjects):
         choices[i] = c
         successes[i] = s
 
-        bic_scores[i] = compute_bic_scores(choices=c, successes=s)
+        bp, lls[i], bic_scores[i] = \
+            compute_bic_scores(choices=c, successes=s)
 
-    return choices, successes, bic_scores
+        best_params.append(bp)
+
+    freq, y_err = freq_and_err(-bic_scores)
+
+    best_model_idx = int(np.argmax(freq))
+
+    assert best_model_idx == MODELS.index(model)
+
+    new_choices = np.zeros((n_subjects, T), dtype=int)
+    new_successes = np.zeros((n_subjects, T), dtype=bool)
+
+    for i in tqdm(range(n_subjects)):
+
+        param = best_params[i][best_model_idx]
+        new_choices[i], new_successes[i] = run_simulation(
+            seed=i+1,
+            agent_model=model, param=param)
+
+    return \
+        choices, successes, \
+        lls, bic_scores, \
+        new_choices, new_successes
 
 
-def plot_bic(
-        bic_scores, ax, fontsize=10,
-        y_lim=None, y_label=None,
-        h_line=None, invert_y_axis=False
-):
+def plot_model_metric(metrics, ax, y_label, title):
 
     n = len(MODELS)
 
@@ -1229,37 +1303,27 @@ def plot_bic(
     y_scatter = []
     colors_scatter = []
 
-    x_tick_labels = MODELS
+    x_tick_labels = [m.__name__ for m in MODELS]
 
     for i in range(n):
 
-        for v in bic_scores[:, i]:
+        for v in metrics[:, i]:
 
             # For boxplot
             values_box_plot[i].append(v)
 
             # For scatter
-            x_scatter.append(i + np.random.uniform(-0.01*n, 0.01*n))
+            x_scatter.append(i + np.random.uniform(-0.05*n, 0.05*n))
             y_scatter.append(v)
             colors_scatter.append(colors[i])
 
-    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=30, alpha=0.5,
+    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=20, alpha=0.2,
                linewidth=0.0, zorder=1)
 
-    if h_line:
-        ax.axhline(h_line, linestyle='--', color='0.3', zorder=-10,
-                   linewidth=0.5)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
 
-    ax.tick_params(axis='both', labelsize=fontsize)
-
-    if y_label:
-        ax.set_ylabel(y_label, fontsize=fontsize)
-
-    if y_lim:
-        ax.set_ylim(y_lim)
-
-    if invert_y_axis:
-        ax.invert_yaxis()
+    # ax.invert_yaxis()
 
     # Boxplot
     bp = ax.boxplot(values_box_plot, positions=positions,
@@ -1269,12 +1333,60 @@ def plot_bic(
         for b in bp[e]:
             b.set(color='black')
 
-    plt.tight_layout()
+
+def freq_and_err(data):
+
+    n_subjects, n_models = data.shape
+
+    counts = np.zeros(n_models)
+
+    max_user = np.max(data, axis=1)
+
+    for i in range(n_models):
+        did_best = data[:, i] == max_user
+        counts[i] = np.sum(did_best)
+
+    ci = np.zeros((2, n_models))
+
+    for i in range(n_models):
+        ci[:, i] = \
+            statsmodels.stats.proportion.proportion_confint(
+                count=counts[i], nobs=n_subjects)
+
+    freq = counts / n_subjects
+
+    y_err = np.absolute(np.subtract(ci, freq))
+    return freq, y_err
 
 
-def plot_fake_xp(choices, successes, bic_scores):
+def plot_bar_best_metric(ax, freq, y_err, y_label, title):
 
-    n_rows = 3
+    x_tick_labels = [m.__name__ for m in MODELS]
+
+    x_pos = np.arange(len(freq))
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(x_tick_labels)
+
+    ax.bar(x_pos, freq, yerr=y_err)
+
+    for i in range(len(freq)):
+
+        ax.text(x=i, y=freq[i]+y_err[1, i]+0.05,
+                s=f'{freq[i]:.2f}', size=6,
+                horizontalalignment='center',
+                )
+
+    ax.set_yticks((0, 0.5, 1))
+    ax.set_ylim((0, max(1, np.max(freq[:]+y_err[1, :])+0.15)))
+
+    ax.set_title(title)
+    ax.set_ylabel(y_label)
+
+
+def plot_fake_xp(choices, successes, lls, bic_scores,
+                 new_choices, new_successes):
+
+    n_rows = 8
     fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
 
     # Plot average
@@ -1294,7 +1406,42 @@ def plot_fake_xp(choices, successes, bic_scores):
 
     ax = axes[2]
 
-    plot_bic(ax=ax, bic_scores=bic_scores)
+    plot_model_metric(ax=ax, metrics=lls,
+                      title="Log-Likelihood Sums",
+                      y_label="LLS")
+
+    ax = axes[3]
+    freq, y_err = freq_and_err(lls)
+    plot_bar_best_metric(ax=ax, freq=freq, y_err=y_err,
+                         y_label='Highest LLS (freq.)',
+                         title="Highest LLS")
+
+    ax = axes[4]
+    plot_model_metric(ax=ax, metrics=bic_scores,
+                      title="BIC Scores",
+                      y_label="BIC")
+    ax.invert_yaxis()
+
+    ax = axes[5]
+    freq, y_err = freq_and_err(-bic_scores)
+    plot_bar_best_metric(ax=ax, freq=freq, y_err=y_err,
+                         y_label='Lowest BIC (freq.)',
+                         title="Lowest BIC")
+
+    # Plot average
+    ax = axes[6]
+
+    for i in range(N):
+        y = new_choices == i
+        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
+
+    custom_ax(ax=ax, y_label='freq. choice', title="Choices Best-fit")
+
+    ax = axes[7]
+
+    plot_mean_std(ax=ax, y=np.asarray(new_successes, dtype=int))
+    custom_ax(ax=ax, y_label='freq. success', title="Successes Best-fit",
+              legend=False)
 
     plt.tight_layout()
     plt.show()
@@ -1302,9 +1449,19 @@ def plot_fake_xp(choices, successes, bic_scores):
 
 def fake_xp():
 
-    model_to_simulate = RescolaWagner
-    data = data_fake_xp(model=model_to_simulate, n_subjects=10)
-    plot_fake_xp(*data)
+    model_to_simulate = RW
+    choices, successes, lls, bic_scores, new_choices, new_successes = \
+        data_fake_xp(model=model_to_simulate, n_subjects=30)
+    plot_fake_xp(choices=choices,
+                 successes=successes,
+                 new_choices=new_choices,
+                 new_successes=new_successes,
+                 bic_scores=bic_scores,
+                 lls=lls)
+    # u, p = scipy.stats.mannwhitneyu(bic_scores[:, 1], bic_scores[:, 2])
+    # print([f"{i:.3f}" for i in bic_scores[:, 1]])
+    # print([f"{i:.3f}" for i in bic_scores[:, 2]])
+    # print(u, p)
 
 
 fake_xp()
