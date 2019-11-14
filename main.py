@@ -972,7 +972,10 @@ param_rcv = data_param_recovery(model=RescolaWagner, n_sets=30)
 
 # Parameter recovery: Plot -------------------------------------------------
 
-def plot_parameter_recovery(data, x_label=None, y_label=None):
+def plot_parameter_recovery(data):
+
+    x_label = 'Simulated'
+    y_label = 'Recovered'
 
     keys = sorted(data.keys())
     n_keys = len(keys)
@@ -1006,7 +1009,7 @@ def plot_parameter_recovery(data, x_label=None, y_label=None):
     plt.show()
 
 
-plot_parameter_recovery(param_rcv, x_label='Simulated', y_label='Recovered')
+plot_parameter_recovery(param_rcv)
 
 
 # Parameter recovery: Stats -------------------------------------------------
@@ -1037,26 +1040,37 @@ def bic(ll, k, n_iteration):
     return -2 * ll + k * np.log(n_iteration)
 
 
-def compute_bic_scores():
+def compute_bic_scores(choices, successes):
 
-    for m in MODELS:
+    n_models = len(MODELS)
+    bic_scores = np.zeros(n_models)
+
+    for j in range(n_models):
+        model_to_fit = MODELS[j]
 
         opt = BanditOptimizer(
-            choices=CHOICES,
-            successes=SUCCESSES,
-            model=m,
+            choices=choices,
+            successes=successes,
+            model=model_to_fit
         )
 
         best_param, best_value = opt.run()
 
         ll = -best_value
 
-        bic_score = bic(ll, len(m.bounds), n_iteration=T)
+        bs = bic(ll, k=len(model_to_fit.bounds), n_iteration=T)
 
-        print(f"BIC {m.__name__} ={bic_score:.3f}")
+        bic_scores[j] = bs
+
+    return bic_scores
 
 
-compute_bic_scores()
+def first_computation_bic():
+
+    bic_scores = compute_bic_scores(choices=CHOICES, successes=SUCCESSES)
+    for i, m in enumerate(MODELS):
+
+        print(f"BIC {m.__name__} = {bic_scores[i]:.3f}")
 
 
 # ============================================================================
@@ -1089,25 +1103,8 @@ def data_confusion_matrix(models, n_sets):
                     agent_model=model_to_simulate,
                     param=param_to_simulate)
 
-            bic_scores = np.zeros(n_models)
-
-            for j in range(n_models):
-
-                model_to_fit = models[j]
-
-                opt = BanditOptimizer(
-                    choices=sim_choices,
-                    successes=sim_successes,
-                    model=model_to_fit
-                )
-
-                best_param, best_value = opt.run()
-
-                ll = -best_value
-
-                bs = bic(ll, k=len(model_to_fit.bounds), n_iteration=T)
-
-                bic_scores[j] = bs
+            bic_scores = compute_bic_scores(choices=sim_choices,
+                                            successes=sim_successes)
 
             min_ = np.min(bic_scores)
 
@@ -1124,15 +1121,15 @@ conf_mt = data_confusion_matrix(models=MODELS, n_sets=30)
 
 # Confusion matrix: Plot -----------------------------------------------------
 
-def plot_confusion_matrix(
-        data,
-        x_label, y_label,
-        x_labels=None, y_labels=None, title="Confusion matrix"):
+def plot_confusion_matrix(data):
 
-    if x_labels is None:
-        x_labels = np.arange(data.shape[1])
-    if y_labels is None:
-        y_labels = np.arange(data.shape[0])
+    confusion_matrix_labels = [m.__name__ for m in MODELS]
+
+    title = "Confusion matrix"
+    x_label = "simulated model"
+    y_label = "fit model"
+    x_tick_labels = confusion_matrix_labels
+    y_tick_labels = confusion_matrix_labels
 
     fig, ax = plt.subplots(figsize=(2.5*data.shape[1],
                                     2.5*data.shape[0]))
@@ -1142,11 +1139,11 @@ def plot_confusion_matrix(
     ax.set_ylabel(y_label)
 
     # We want to show all ticks...
-    ax.set_xticks(np.arange(len(x_labels)))
-    ax.set_yticks(np.arange(len(y_labels)))
+    ax.set_xticks(np.arange(len(x_tick_labels)))
+    ax.set_yticks(np.arange(len(y_tick_labels)))
     # ... and label them with the respective list entries
-    ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
+    ax.set_xticklabels(x_tick_labels)
+    ax.set_yticklabels(y_tick_labels)
 
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
@@ -1158,8 +1155,8 @@ def plot_confusion_matrix(
     ax.tick_params(which="minor", bottom=False, left=False)
 
     # Loop over data dimensions and create text annotations.
-    for i in range(len(y_labels)):
-        for j in range(len(x_labels)):
+    for i in range(len(y_tick_labels)):
+        for j in range(len(x_tick_labels)):
             ax.text(j, i, f'{data[i, j]:.3f}',
                     ha="center", va="center", color="black")
 
@@ -1168,15 +1165,64 @@ def plot_confusion_matrix(
 
     plt.colorbar(im, cax=cax)
 
-    if title is not None:
-        ax.set_title(title)
+    ax.set_title(title)
 
     fig.tight_layout()
     plt.show()
 
 
-confusion_matrix_labels = [m.__name__ for m in MODELS]
-plot_confusion_matrix(data=conf_mt, x_label="simulated model",
-                      y_label="fit model",
-                      x_labels=confusion_matrix_labels,
-                      y_labels=confusion_matrix_labels)
+plot_confusion_matrix(data=conf_mt)
+
+# ======================================================================
+# Fake experiment  =====================================================
+# ======================================================================
+
+
+def data_fake_xp(model, n_subjects):
+
+    choices = np.zeros((n_subjects, T), dtype=int)
+    successes = np.zeros((n_subjects, T), dtype=bool)
+    bic_scores = np.zeros((n_subjects, len(MODELS)))
+
+    for i in range(n_subjects):
+
+        param = [np.random.uniform(*b) for b in model.bounds]
+        c, s = run_simulation(agent_model=model, param=param)
+
+        choices[i] = c
+        successes[i] = s
+
+        bic_scores[i] = compute_bic_scores(choices=c, successes=s)
+
+    return choices, successes, bic_scores
+
+
+def plot_fake_xp(choices, successes):
+
+    n_rows = 4
+    fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
+
+    # Plot average
+    ax = axes[2]
+
+    for i in range(N):
+        y = choices == i
+        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
+
+    custom_ax(ax=ax, y_label='freq. choice', title="Choices")
+
+    ax = axes[3]
+
+    plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
+    custom_ax(ax=ax, y_label='freq. success', title="Successes",
+              legend=False)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def fake_xp():
+
+    model_to_simulate = RescolaWagner
+    data_fake_xp(model=model_to_simulate, n_subjects=10)
+
