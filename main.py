@@ -43,7 +43,8 @@ class Random:
     No-learning model
     """
     param_labels = ()
-    bounds = ()
+    fit_bounds = ()
+    xp_bounds = ()
 
     def __init__(self):
         self.options = np.arange(N)
@@ -67,7 +68,8 @@ class RescolaWagner(Random):
     Reinforcement learning model
     """
     param_labels = ("alpha", "beta")
-    bounds = (0.01, 1), (0.05, 1)
+    fit_bounds = (0.01, 1), (0.05, 1)
+    xp_bounds = (0.1, 0.25), (0.01, 0.15)
 
     def __init__(self, q_learning_rate, q_temp, initial_value=0.5):
         super().__init__()
@@ -89,7 +91,8 @@ class RescolaWagner(Random):
 class RescolaWagnerChoiceKernel(RescolaWagner):
 
     param_labels = ("alpha", "beta", "alpha_c", "beta_c")
-    bounds = (0.01, 1), (0.05, 1), (0.01, 1), (0.05, 1)
+    fit_bounds = (0.01, 1), (0.05, 1), (0.01, 1), (0.05, 1)
+    xp_bounds = (0.1, 0.3), (0.05, 0.15), (0.1, 0.3), (0.05, 0.15)
 
     def __init__(self, q_learning_rate, q_temp, c_learning_rate, c_temp):
 
@@ -617,6 +620,9 @@ class BanditOptimizer:
         self.successes = successes
         self.model = model
 
+        assert hasattr(model, 'fit_bounds'), \
+            f"{model.__name__} has not 'fit_bounds' attribute"
+
         self.t = 0
 
     def objective(self, param):
@@ -651,11 +657,11 @@ class BanditOptimizer:
 
     def run(self):
 
-        if self.model.bounds:
+        if self.model.fit_bounds:
             res = scipy.optimize.minimize(
                 fun=self._func,
-                x0=np.full(len(self.model.bounds), 0.5),
-                bounds=self.model.bounds)
+                x0=np.full(len(self.model.fit_bounds), 0.5),
+                bounds=self.model.fit_bounds)
             assert res.success
 
             best_param = res.x
@@ -848,6 +854,8 @@ plot_pop_comparison_best_fit(*data_pop_comparison_best_fit())
 def data_local_minima(model, choices, successes, grid_size=20):
 
     assert len(model.param_labels) == 2
+    assert hasattr(model, 'fit_bounds'), \
+        f"{model.__name__} has not 'fit_bounds' attribute"
 
     ll = np.zeros((grid_size, grid_size))
 
@@ -857,8 +865,8 @@ def data_local_minima(model, choices, successes, grid_size=20):
         model=model
     )
 
-    param0_grid = np.linspace(*model.bounds[0], grid_size)
-    param1_grid = np.linspace(*model.bounds[1], grid_size)
+    param0_grid = np.linspace(*model.fit_bounds[0], grid_size)
+    param1_grid = np.linspace(*model.fit_bounds[1], grid_size)
 
     for i in tqdm(range(len(param0_grid))):
         for j in range(len(param1_grid)):
@@ -936,19 +944,19 @@ def data_param_recovery(model, n_sets):
         k: np.zeros((2, n_sets)) for k in param_labels
     }
 
-    for i, set_idx in tqdm(enumerate(range(n_sets))):
+    for set_idx in tqdm(range(n_sets)):
 
         param_to_simulate = np.zeros(2)
 
         for param_idx in range(n_param):
-            v = np.random.uniform(*model.bounds[param_idx])
+            v = np.random.uniform(*model.fit_bounds[param_idx])
 
             param[param_labels[param_idx]][0, set_idx] = v
             param_to_simulate[param_idx] = v
 
         sim_choices, sim_successes = \
             run_simulation(
-                seed=i,
+                seed=set_idx,
                 agent_model=model,
                 param=param_to_simulate,
             )
@@ -1058,7 +1066,7 @@ def compute_bic_scores(choices, successes):
 
         ll = -best_value
 
-        bs = bic(ll, k=len(model_to_fit.bounds), n_iteration=T)
+        bs = bic(ll, k=len(model_to_fit.fit_bounds), n_iteration=T)
 
         bic_scores[j] = bs
 
@@ -1093,9 +1101,9 @@ def data_confusion_matrix(models, n_sets):
 
         for j in range(n_sets):
 
-            param_to_simulate = []
-            for b in model_to_simulate.bounds:
-                param_to_simulate.append(np.random.uniform(*b))
+            param_to_simulate = \
+                [np.random.uniform(*b)
+                 for b in model_to_simulate.fit_bounds]
 
             sim_choices, sim_successes = \
                 run_simulation(
@@ -1178,7 +1186,11 @@ plot_confusion_matrix(data=conf_mt)
 # ======================================================================
 
 
+@use_pickle
 def data_fake_xp(model, n_subjects):
+
+    assert hasattr(model, 'fit_bounds'), \
+        f"{model.__name__} has not 'fit_bounds' attribute"
 
     choices = np.zeros((n_subjects, T), dtype=int)
     successes = np.zeros((n_subjects, T), dtype=bool)
@@ -1186,8 +1198,9 @@ def data_fake_xp(model, n_subjects):
 
     for i in range(n_subjects):
 
-        param = [np.random.uniform(*b) for b in model.bounds]
-        c, s = run_simulation(agent_model=model, param=param)
+        param = [np.random.uniform(*b) for b in model.xp_bounds]
+        c, s = run_simulation(seed=i,
+                              agent_model=model, param=param)
 
         choices[i] = c
         successes[i] = s
@@ -1198,17 +1211,15 @@ def data_fake_xp(model, n_subjects):
 
 
 def plot_bic(
-        results, ax, fontsize=10,
+        bic_scores, ax, fontsize=10,
         y_lim=None, y_label=None,
         h_line=None, invert_y_axis=False
 ):
-    colors = np.array([f"C{i}" for i in range(N)])
 
-    n = len(results.keys())
+    n = len(MODELS)
 
     # Colors
-    if colors is None:
-        colors = ["black" for _ in range(n)]
+    colors = np.array([f"C{i}" for i in range(n)])
 
     # For boxplot
     positions = list(range(n))
@@ -1218,33 +1229,31 @@ def plot_bic(
     y_scatter = []
     colors_scatter = []
 
-    x_tick_labels = sorted(results.keys())
+    x_tick_labels = MODELS
 
-    for i, label in enumerate(x_tick_labels):
+    for i in range(n):
 
-        for v in results[label]:
+        for v in bic_scores[:, i]:
 
             # For boxplot
             values_box_plot[i].append(v)
 
             # For scatter
-            x_scatter.append(i)
+            x_scatter.append(i + np.random.uniform(-0.01*n, 0.01*n))
             y_scatter.append(v)
             colors_scatter.append(colors[i])
 
-    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=30, alpha=0.5, linewidth=0.0, zorder=1)
+    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=30, alpha=0.5,
+               linewidth=0.0, zorder=1)
 
     if h_line:
-        ax.axhline(h_line, linestyle='--', color='0.3', zorder=-10, linewidth=0.5)
+        ax.axhline(h_line, linestyle='--', color='0.3', zorder=-10,
+                   linewidth=0.5)
 
     ax.tick_params(axis='both', labelsize=fontsize)
 
-    # ax.set_xlabel("Type of control\nMonkey {}.".format(monkey), fontsize=fontsize)
-    # ax.set_xlabel("Control type", fontsize=fontsize)
     if y_label:
         ax.set_ylabel(y_label, fontsize=fontsize)
-
-    # ax.set_yticks(np.arange(0.4, 1.1, 0.2))
 
     if y_lim:
         ax.set_ylim(y_lim)
@@ -1253,20 +1262,19 @@ def plot_bic(
         ax.invert_yaxis()
 
     # Boxplot
-    bp = ax.boxplot(values_box_plot, positions=positions, labels=x_tick_labels, showfliers=False, zorder=2)
+    bp = ax.boxplot(values_box_plot, positions=positions,
+                    labels=x_tick_labels, showfliers=False, zorder=2)
 
-    for e in ['boxes', 'caps', 'whiskers', 'medians']:  # Warning: only one box, but several whiskers by plot
+    for e in ['boxes', 'caps', 'whiskers', 'medians']:
         for b in bp[e]:
             b.set(color='black')
-            # b.set_alpha(1)
 
-    # ax.set_aspect(3)
     plt.tight_layout()
 
 
 def plot_fake_xp(choices, successes, bic_scores):
 
-    n_rows = 2
+    n_rows = 3
     fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
 
     # Plot average
@@ -1284,6 +1292,10 @@ def plot_fake_xp(choices, successes, bic_scores):
     custom_ax(ax=ax, y_label='freq. success', title="Successes",
               legend=False)
 
+    ax = axes[2]
+
+    plot_bic(ax=ax, bic_scores=bic_scores)
+
     plt.tight_layout()
     plt.show()
 
@@ -1292,5 +1304,7 @@ def fake_xp():
 
     model_to_simulate = RescolaWagner
     data = data_fake_xp(model=model_to_simulate, n_subjects=10)
-    plot_fake_xp(data)
+    plot_fake_xp(*data)
 
+
+fake_xp()
