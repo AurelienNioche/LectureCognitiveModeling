@@ -1197,13 +1197,80 @@ def data_fake_xp(model, n_subjects):
     return choices, successes, bic_scores
 
 
-def plot_fake_xp(choices, successes):
+def plot_bic(
+        results, ax, fontsize=10,
+        y_lim=None, y_label=None,
+        h_line=None, invert_y_axis=False
+):
+    colors = np.array([f"C{i}" for i in range(N)])
 
-    n_rows = 4
+    n = len(results.keys())
+
+    # Colors
+    if colors is None:
+        colors = ["black" for _ in range(n)]
+
+    # For boxplot
+    positions = list(range(n))
+    values_box_plot = [[] for _ in range(n)]
+
+    x_scatter = []
+    y_scatter = []
+    colors_scatter = []
+
+    x_tick_labels = sorted(results.keys())
+
+    for i, label in enumerate(x_tick_labels):
+
+        for v in results[label]:
+
+            # For boxplot
+            values_box_plot[i].append(v)
+
+            # For scatter
+            x_scatter.append(i)
+            y_scatter.append(v)
+            colors_scatter.append(colors[i])
+
+    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=30, alpha=0.5, linewidth=0.0, zorder=1)
+
+    if h_line:
+        ax.axhline(h_line, linestyle='--', color='0.3', zorder=-10, linewidth=0.5)
+
+    ax.tick_params(axis='both', labelsize=fontsize)
+
+    # ax.set_xlabel("Type of control\nMonkey {}.".format(monkey), fontsize=fontsize)
+    # ax.set_xlabel("Control type", fontsize=fontsize)
+    if y_label:
+        ax.set_ylabel(y_label, fontsize=fontsize)
+
+    # ax.set_yticks(np.arange(0.4, 1.1, 0.2))
+
+    if y_lim:
+        ax.set_ylim(y_lim)
+
+    if invert_y_axis:
+        ax.invert_yaxis()
+
+    # Boxplot
+    bp = ax.boxplot(values_box_plot, positions=positions, labels=x_tick_labels, showfliers=False, zorder=2)
+
+    for e in ['boxes', 'caps', 'whiskers', 'medians']:  # Warning: only one box, but several whiskers by plot
+        for b in bp[e]:
+            b.set(color='black')
+            # b.set_alpha(1)
+
+    # ax.set_aspect(3)
+    plt.tight_layout()
+
+
+def plot_fake_xp(choices, successes, bic_scores):
+
+    n_rows = 2
     fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
 
     # Plot average
-    ax = axes[2]
+    ax = axes[0]
 
     for i in range(N):
         y = choices == i
@@ -1211,7 +1278,7 @@ def plot_fake_xp(choices, successes):
 
     custom_ax(ax=ax, y_label='freq. choice', title="Choices")
 
-    ax = axes[3]
+    ax = axes[1]
 
     plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
     custom_ax(ax=ax, y_label='freq. success', title="Successes",
@@ -1224,5 +1291,6 @@ def plot_fake_xp(choices, successes):
 def fake_xp():
 
     model_to_simulate = RescolaWagner
-    data_fake_xp(model=model_to_simulate, n_subjects=10)
+    data = data_fake_xp(model=model_to_simulate, n_subjects=10)
+    plot_fake_xp(data)
 
