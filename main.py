@@ -45,9 +45,8 @@ class Random:
     param_labels = ()
     bounds = ()
 
-    def __init__(self, n_option):
-        self.n_option = n_option
-        self.options = np.arange(n_option)
+    def __init__(self):
+        self.options = np.arange(N)
 
     def choose(self):
         p = self.decision_rule()
@@ -57,37 +56,72 @@ class Random:
         self.updating_rule(option=option, success=success)
 
     def decision_rule(self):
-        return np.ones(self.n_option) / self.n_option
+        return np.ones(N) / N
 
     def updating_rule(self, option, success):
         pass
 
 
-class RL(Random):
+class RescolaWagner(Random):
     """
     Reinforcement learning model
     """
     param_labels = ("alpha", "beta")
     bounds = (0.01, 1), (0.05, 1)
 
-    def __init__(self, learning_rate, temp, n_option, initial_value=0.5):
-        super().__init__(n_option=n_option)
-        self.values = np.full(n_option, initial_value)
-        self.learning_rate = learning_rate
-        self.temp = temp
+    def __init__(self, q_learning_rate, q_temp, initial_value=0.5):
+        super().__init__()
+        self.q_values = np.full(N, initial_value)
+        self.q_learning_rate = q_learning_rate
+        self.q_temp = q_temp
 
     def decision_rule(self):
 
-        p_soft = np.exp(self.values / self.temp) / \
-             np.sum(np.exp(self.values / self.temp), axis=0)
+        p_soft = np.exp(self.q_values / self.q_temp) / \
+                 np.sum(np.exp(self.q_values / self.q_temp), axis=0)
         return p_soft
 
     def updating_rule(self, option, success):
-        self.values[option] += \
-            self.learning_rate * (success - self.values[option])
+        self.q_values[option] += \
+            self.q_learning_rate * (success - self.q_values[option])
 
 
-MODELS = Random, RL
+class RescolaWagnerChoiceKernel(RescolaWagner):
+
+    param_labels = ("alpha", "beta", "alpha_c", "beta_c")
+    bounds = (0.01, 1), (0.05, 1), (0.01, 1), (0.05, 1)
+
+    def __init__(self, q_learning_rate, q_temp, c_learning_rate, c_temp):
+
+        super().__init__(q_learning_rate=q_learning_rate, q_temp=q_temp)
+        self.c_learning_rate = c_learning_rate
+        self.c_temp = c_temp
+        self.c_values = np.zeros(N)
+
+    def decision_rule(self):
+
+        p_soft = np.exp(
+            (self.q_values / self.q_temp) +
+            (self.c_values / self.c_temp)
+        ) / \
+             np.sum(
+                 np.exp(
+                     (self.q_values / self.q_temp) +
+                     (self.c_values / self.c_temp)
+                     ), axis=0)
+        return p_soft
+
+    def updating_rule(self, option, success):
+
+        a = np.zeros(N, dtype=int)
+        a[option] = 1
+        self.c_values[:] += \
+            self.c_learning_rate * (a - self.c_values[:])
+
+        super().updating_rule(option=option, success=success)
+
+
+MODELS = Random, RescolaWagner, RescolaWagnerChoiceKernel
 
 # Study the effect of your parameters ========================================
 
@@ -101,11 +135,11 @@ def plot_learning_parameter(n_iteration=100,
 
     for i in range(n_param_values):
         alpha = param_values[i]
-        agent = RL(learning_rate=alpha,
-                   temp=0.0, n_option=1)
+        agent = RescolaWagner(q_learning_rate=alpha,
+                              q_temp=None)
         for t in range(n_iteration):
 
-            values[t, i] = agent.values[0]
+            values[t, i] = agent.q_values[0]
             agent.learn(option=0, success=1)
 
     fig, ax = plt.subplots(figsize=(4, 4))
@@ -174,11 +208,11 @@ PARAM_RL = (0.1, 0.1)
 
 
 @use_pickle
-def run_simulation(agent_model, param=(), seed=None, force=False):
+def run_simulation(seed, agent_model, param=()):
 
     np.random.seed(seed)
 
-    agent = agent_model(n_option=N, *param)
+    agent = agent_model(*param)
 
     choices = np.zeros(T, dtype=int)
     successes = np.zeros(T, dtype=bool)
@@ -205,7 +239,7 @@ def run_simulation(agent_model, param=(), seed=None, force=False):
 
 
 CHOICES, SUCCESSES = \
-    run_simulation(agent_model=RL, param=PARAM_RL, seed=SEED)
+    run_simulation(agent_model=RescolaWagner, param=PARAM_RL, seed=SEED)
 
 
 # Plot ---------------------------------------------------------------------
@@ -389,9 +423,18 @@ def format_p(p, threshold=0.05):
 
 def data_latent_variables(choices, successes, model, param):
 
-    agent = model(n_option=N, *param)
+    """
+    This function aims to work only with RescolaWagner
+    :param choices:
+    :param successes:
+    :param model:
+    :param param:
+    :return:
+    """
 
-    assert hasattr(agent, "values"), \
+    agent = model(*param)
+
+    assert hasattr(agent, "q_values"), \
         "Model instance needs to have 'values' attribute"
 
     q_values = np.zeros((T, N))
@@ -401,7 +444,7 @@ def data_latent_variables(choices, successes, model, param):
     for t in range(T):
 
         # Register values
-        q_values[t] = agent.values
+        q_values[t] = agent.q_values
 
         # Register probablility of choices
         p_choices[t] = agent.decision_rule()
@@ -452,7 +495,7 @@ def plot_latent_variables(q_values, p_choices, choices, successes,
 Q_VALUES, P_CHOICES = data_latent_variables(
         choices=CHOICES,
         successes=SUCCESSES,
-        model=RL,
+        model=RescolaWagner,
         param=PARAM_RL
     )
 
@@ -478,7 +521,7 @@ def population_simulation(model, param, n=30):
     for i in range(n):
 
         choices, successes \
-            = run_simulation(agent_model=model, param=param, force=True)
+            = run_simulation(seed=i, agent_model=model, param=param)
 
         q_values, p_choices \
             = data_latent_variables(
@@ -551,7 +594,7 @@ def plot_pop_latent_variables(
 
 
 POP_Q_VALUES, POP_P_CHOICES, POP_CHOICES, POP_SUCCESSES = \
-    population_simulation(model=RL, param=PARAM_RL)
+    population_simulation(model=RescolaWagner, param=PARAM_RL)
 
 plot_pop_latent_variables(
     q_values=POP_Q_VALUES,
@@ -569,11 +612,10 @@ class BanditOptimizer:
     def __init__(self,
                  choices,
                  successes,
-                 model, bounds=None):
+                 model):
         self.choices = choices
         self.successes = successes
         self.model = model
-        self.bounds = bounds
 
         self.t = 0
 
@@ -582,9 +624,9 @@ class BanditOptimizer:
         n_iteration = len(self.choices)
         if isinstance(param, type(None)):
             assert self.model == Random
-            agent = self.model(n_option=N)
+            agent = self.model()
         else:
-            agent = self.model(n_option=N, *list(param))
+            agent = self.model(*param)
 
         log_likelihood = np.zeros(n_iteration)
 
@@ -609,11 +651,11 @@ class BanditOptimizer:
 
     def run(self):
 
-        if self.bounds:
+        if self.model.bounds:
             res = scipy.optimize.minimize(
                 fun=self._func,
-                x0=np.full(len(self.bounds), 0.5),
-                bounds=self.bounds)
+                x0=np.full(len(self.model.bounds), 0.5),
+                bounds=self.model.bounds)
             assert res.success
 
             best_param = res.x
@@ -639,8 +681,7 @@ def get_best_param():
     opt = BanditOptimizer(
         choices=CHOICES,
         successes=SUCCESSES,
-        model=RL,
-        bounds=RL.bounds
+        model=RescolaWagner
     )
 
     best_param, best_value = opt.run()
@@ -657,19 +698,21 @@ def data_comparison_best_fit():
     # Get latent variables for best_fit
     q_values_bf_same_hist, p_choices_bf_same_hist = \
         data_latent_variables(
-            model=RL,
+            model=RescolaWagner,
             choices=CHOICES,
             successes=SUCCESSES,
             param=BEST_PARAM
         )
 
     # Run new simulation with best param
+    new_seed = SEED + 1
     choices_new, successes_new = \
-        run_simulation(agent_model=RL,
-                       param=BEST_PARAM, force=True)
+        run_simulation(seed=new_seed,
+                       agent_model=RescolaWagner,
+                       param=BEST_PARAM)
 
     q_values_new, p_choices_new = data_latent_variables(
-        model=RL,
+        model=RescolaWagner,
         choices=choices_new,
         successes=successes_new,
         param=BEST_PARAM
@@ -744,11 +787,11 @@ def data_pop_comparison_best_fit():
 
     # Run simulations with INITIAL parameters
     data_init = \
-        population_simulation(model=RL, param=PARAM_RL)
+        population_simulation(model=RescolaWagner, param=PARAM_RL)
 
     # Run new simulation with BEST parameters
     data_best = \
-        population_simulation(model=RL, param=BEST_PARAM)
+        population_simulation(model=RescolaWagner, param=BEST_PARAM)
 
     return data_init, data_best
 
@@ -811,8 +854,7 @@ def data_local_minima(model, choices, successes, grid_size=20):
     opt = BanditOptimizer(
         choices=choices,
         successes=successes,
-        model=model,
-        bounds=model.bounds
+        model=model
     )
 
     param0_grid = np.linspace(*model.bounds[0], grid_size)
@@ -832,7 +874,7 @@ def data_local_minima(model, choices, successes, grid_size=20):
 
 
 local_minima = data_local_minima(
-    model=RL,
+    model=RescolaWagner,
     choices=CHOICES,
     successes=SUCCESSES)
 
@@ -876,7 +918,7 @@ def plot_local_minima(
 
 
 plot_local_minima(
-    local_minima, labels=RL.param_labels,
+    local_minima, labels=RescolaWagner.param_labels,
     title='Local minima exploration')
 
 
@@ -885,7 +927,7 @@ plot_local_minima(
 # ==========================================================================
 
 @use_pickle
-def data_param_recovery(model, n_sets=30):
+def data_param_recovery(model, n_sets):
 
     param_labels = model.param_labels
     n_param = len(param_labels)
@@ -894,7 +936,7 @@ def data_param_recovery(model, n_sets=30):
         k: np.zeros((2, n_sets)) for k in param_labels
     }
 
-    for set_idx in tqdm(range(n_sets)):
+    for i, set_idx in tqdm(enumerate(range(n_sets))):
 
         param_to_simulate = np.zeros(2)
 
@@ -906,6 +948,7 @@ def data_param_recovery(model, n_sets=30):
 
         sim_choices, sim_successes = \
             run_simulation(
+                seed=i,
                 agent_model=model,
                 param=param_to_simulate,
             )
@@ -913,8 +956,7 @@ def data_param_recovery(model, n_sets=30):
         opt = BanditOptimizer(
             choices=sim_choices,
             successes=sim_successes,
-            model=model,
-            bounds=model.bounds
+            model=model
         )
 
         best_param, best_value = opt.run()
@@ -925,7 +967,7 @@ def data_param_recovery(model, n_sets=30):
     return param
 
 
-param_rcv = data_param_recovery(RL)
+param_rcv = data_param_recovery(model=RescolaWagner, n_sets=30)
 
 
 # Parameter recovery: Plot -------------------------------------------------
@@ -1003,7 +1045,6 @@ def compute_bic_scores():
             choices=CHOICES,
             successes=SUCCESSES,
             model=m,
-            bounds=m.bounds
         )
 
         best_param, best_value = opt.run()
@@ -1026,7 +1067,7 @@ compute_bic_scores()
 
 
 @use_pickle
-def data_confusion_matrix(models, n_sets=10):
+def data_confusion_matrix(models, n_sets):
 
     n_models = len(models)
 
@@ -1036,7 +1077,7 @@ def data_confusion_matrix(models, n_sets=10):
 
         model_to_simulate = models[i]
 
-        for _ in range(n_sets):
+        for j in range(n_sets):
 
             param_to_simulate = []
             for b in model_to_simulate.bounds:
@@ -1044,6 +1085,7 @@ def data_confusion_matrix(models, n_sets=10):
 
             sim_choices, sim_successes = \
                 run_simulation(
+                    seed=j,
                     agent_model=model_to_simulate,
                     param=param_to_simulate)
 
@@ -1056,8 +1098,7 @@ def data_confusion_matrix(models, n_sets=10):
                 opt = BanditOptimizer(
                     choices=sim_choices,
                     successes=sim_successes,
-                    model=model_to_fit,
-                    bounds=model_to_fit.bounds
+                    model=model_to_fit
                 )
 
                 best_param, best_value = opt.run()

@@ -42,9 +42,9 @@ def use_pickle(func):
 
         bkp_file = os.path.join(BKP_FOLDER, file_name)
 
-        force = 'force' in kwargs and kwargs['force']
+        # force = 'force' in kwargs and kwargs['force']
 
-        if os.path.exists(bkp_file) and USE_PICKLE and not force:
+        if os.path.exists(bkp_file) and USE_PICKLE:
             print(f"loading from: {bkp_file}")
             data = pickle.load(open(bkp_file, 'rb'))
 

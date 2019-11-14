@@ -21,11 +21,11 @@ Material for the class
 
 2.2 Latent variables
 
-* Plot: Q-values / p-choices + behavior over time [ind]
+* Plot: Q-values / p-choices + behavior over time IND
 
 2.3 Population
 
-* Plot: latent variables + behavior over time [pop]
+* Plot: latent variables + behavior over time POP
 
 
 # 2. Parameter recovery [RL only]
@@ -36,11 +36,15 @@ Material for the class
 
 3.1 Individual
 
-* Plot: Initial results + Best fit same hist + Best fit new history 
+* Plot: Initial results + Best fit same hist + Best fit new history IND 
 
 3.2 Population
 
+* Plot: Initial results POP + Best fit POP
+
 3.3 Actual parameter recovery
+
+* Plot: scatter plot
 
 # 3. Model comparison
 
