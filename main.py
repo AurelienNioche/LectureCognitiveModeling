@@ -123,7 +123,7 @@ class RW(Random):
     def decision_rule(self):
 
         p_soft = np.exp(self.q_values / self.q_temp) / \
-                 np.sum(np.exp(self.q_values / self.q_temp), axis=0)
+                 np.sum(np.exp(self.q_values / self.q_temp))
         return p_soft
 
     def updating_rule(self, option, success):
@@ -154,11 +154,10 @@ class RWCK(RW):
             (self.q_values / self.q_temp) +
             (self.c_values / self.c_temp)
         ) / \
-             np.sum(
-                 np.exp(
+             np.sum(np.exp(
                      (self.q_values / self.q_temp) +
                      (self.c_values / self.c_temp)
-                     ), axis=0)
+             ))
         return p_soft
 
     def updating_rule(self, option, success):
@@ -1125,6 +1124,7 @@ def compute_bic_scores(choices, successes):
     return best_params, lls, bic_scores
 
 
+@use_pickle
 def first_computation_bic():
 
     best_params, lls, bic_scores = \
@@ -1132,6 +1132,9 @@ def first_computation_bic():
     for i, m in enumerate(MODELS):
 
         print(f"BIC {m.__name__} = {bic_scores[i]:.3f}")
+
+
+first_computation_bic()
 
 
 # ============================================================================
@@ -1173,17 +1176,51 @@ def data_confusion_matrix(models, n_sets):
             idx_min = np.arange(n_models)[bic_scores == min_]
             confusion_matrix[i, idx_min] += 1/len(idx_min)
 
-        confusion_matrix[i] /= np.sum(confusion_matrix[i])
-
     return confusion_matrix
 
 
-conf_mt = data_confusion_matrix(models=MODELS, n_sets=30)
+N_SETS_CONF = 30
+conf_mt = data_confusion_matrix(models=MODELS, n_sets=N_SETS_CONF)
+
+
+# Confusion matrix: Stats -----------------------------------------------------
+
+def stats_conf_mt(obs):
+
+    print("STATS CONFUSION MATRIX")
+
+    for i in range(len(obs)):
+
+        f_obs = obs[i]
+        # tot = np.sum(data[i])
+        # f_exp = [tot if j == i else 0 for j in range(len(data[i]))]
+        chi2, p = scipy.stats.chisquare(f_obs=f_obs)
+
+        print(f"Chi2={chi2:.3f}, p{format_p(p)}")
+
+        k = obs[i, i]
+        n = np.sum(obs[i])
+        ci_low, ci_upp = \
+            statsmodels.stats.proportion.proportion_confint(count=k, nobs=n)
+        print(f"prop choose best= {k/n:.3f}, CI=[{ci_low:.3f}, {ci_upp:.3f}]")
+    #
+    # chi2, p, dof, expctd = \
+    #     scipy.stats.chi2_contingency(obs, correction=False)
+    #
+    # print(f"Chi2 Cont={chi2:.3f}, p{format_p(p)}")
+    # print("expctd", expctd)
+
+
+stats_conf_mt(conf_mt)
 
 
 # Confusion matrix: Plot -----------------------------------------------------
 
 def plot_confusion_matrix(data):
+
+    # Normalize
+    for i in range(len(data)):
+        data[i] /= np.sum(data[i])
 
     confusion_matrix_labels = [m.__name__ for m in MODELS]
 
