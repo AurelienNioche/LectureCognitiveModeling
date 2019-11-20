@@ -20,25 +20,44 @@ def use_pickle(func):
 
     def call_func(*args, **kwargs):
 
-        info_file = os.path.join(BKP_FOLDER, f"{func.__name__}_info.p")
+        idx_file = os.path.join(BKP_FOLDER, f"{func.__name__}_idx.p")
 
-        key = kwargs.copy().update({'args': args})
+        info = {k: v for k, v in kwargs.items()}
+        info.update({'args': args})
 
-        if os.path.exists(info_file):
+        if os.path.exists(idx_file):
 
-            info = pickle.load(open(info_file, 'rb'))
-            if key in info.keys() and os.path.exists(info[key]):
-                data = pickle.load(open(info[key], 'rb'))
-                return data
+            idx = pickle.load(open(idx_file, 'rb'))
+            for i in range(idx):
+
+                info_loaded = pickle.load(
+                    open(os.path.join(BKP_FOLDER,
+                                      f"{func.__name__}_{i}_info.p"),
+                         'rb'))
+                print("info", info)
+                print("info loaded", info_loaded)
+                if info == info_loaded:
+                    data = pickle.load(
+                        open(os.path.join(BKP_FOLDER,
+                                          f"{func.__name__}_{i}_data.p"),
+                         'rb'))
+                    return data
         else:
-            info = {'idx': -1}
+            idx = -1
+
+        idx += 1
 
         data = func(*args, **kwargs)
 
-        bkp_file = os.path.join(BKP_FOLDER,
-                                f"{func.__name__}{info['idx'] + 1}.p")
-        pickle.dump(data, open(bkp_file, 'wb'))
+        data_file = os.path.join(BKP_FOLDER,
+                                 f"{func.__name__}_{idx}_data.p")
+
+        info_file = os.path.join(BKP_FOLDER,
+                                 f"{func.__name__}_{idx}_info.p")
+
+        pickle.dump(data, open(data_file, 'wb'))
         pickle.dump(info, open(info_file, 'wb'))
+        pickle.dump(idx, open(idx_file, 'wb'))
 
         return data
 
