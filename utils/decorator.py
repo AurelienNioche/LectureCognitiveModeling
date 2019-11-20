@@ -1,6 +1,6 @@
 import os
 import pickle
-
+import numpy as np
 
 BKP_FOLDER = os.path.join("bkp", "run")
 os.makedirs(BKP_FOLDER, exist_ok=True)
@@ -18,30 +18,48 @@ def use_pickle(func):
     :return: output of func(*args, **kwargs)
     """
 
+    def file_name(suffix):
+        return os.path.join(BKP_FOLDER, f"{func.__name__}_{suffix}.p")
+
+    def load(f_name):
+        return pickle.load(open(f_name, 'rb'))
+
+    def dump(obj, f_name):
+        return pickle.dump(obj, open(f_name, 'wb'))
+
     def call_func(*args, **kwargs):
 
-        idx_file = os.path.join(BKP_FOLDER, f"{func.__name__}_idx.p")
+        idx_file = file_name('idx')
 
         info = {k: v for k, v in kwargs.items()}
         info.update({'args': args})
 
         if os.path.exists(idx_file):
 
-            idx = pickle.load(open(idx_file, 'rb'))
+            idx = load(idx_file)
             for i in range(idx):
 
-                info_loaded = pickle.load(
-                    open(os.path.join(BKP_FOLDER,
-                                      f"{func.__name__}_{i}_info.p"),
-                         'rb'))
-                print("info", info)
-                print("info loaded", info_loaded)
-                if info == info_loaded:
-                    data = pickle.load(
-                        open(os.path.join(BKP_FOLDER,
-                                          f"{func.__name__}_{i}_data.p"),
-                         'rb'))
+                info_loaded = load(file_name(f"{i}_info"))
+                # print("info", info)
+                # print("info loaded", info_loaded)
+                same = True
+                for k in info_loaded.keys():
+                    try:
+                        if not info_loaded[k] == info[k]:
+                            same = False
+                            break
+
+                    # Comparison term to term for arrays
+                    except ValueError:
+                        if not np.all([info_loaded[k][i] == info[k][i]
+                                       for i in range(len(info[k]))]):
+                            same = False
+                            break
+
+                if same:
+                    data = load(file_name(f"{i}_data"))
                     return data
+
         else:
             idx = -1
 
@@ -49,15 +67,12 @@ def use_pickle(func):
 
         data = func(*args, **kwargs)
 
-        data_file = os.path.join(BKP_FOLDER,
-                                 f"{func.__name__}_{idx}_data.p")
+        data_file = file_name(f"{idx}_data")
+        info_file = file_name(f"{idx}_info")
 
-        info_file = os.path.join(BKP_FOLDER,
-                                 f"{func.__name__}_{idx}_info.p")
-
-        pickle.dump(data, open(data_file, 'wb'))
-        pickle.dump(info, open(info_file, 'wb'))
-        pickle.dump(idx, open(idx_file, 'wb'))
+        dump(data, data_file)
+        dump(info, info_file)
+        dump(idx, idx_file)
 
         return data
 

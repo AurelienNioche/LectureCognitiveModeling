@@ -228,7 +228,7 @@ MODEL_XP = RW
 
 # Get data ----------------------------------------------------
 SEED_SINGLE = 0
-PARAM_SINGLE = (0.1, 0.1)
+PARAM_SINGLE = np.array([0.1, 0.1])
 CHOICES_SINGLE, SUCCESSES_SINGLE = \
     run_simulation(agent_model=RW, param=PARAM_SINGLE, seed=SEED_SINGLE)
 
@@ -451,7 +451,7 @@ def get_best_param():
 
 # Get the best-fit parameters
 BEST_PARAM_SINGLE = get_best_param()
-print(f"'True' parameters: {PARAM_SINGLE}")
+print(f"'True' parameters: {tuple(PARAM_SINGLE)}")
 print(f"Best-fit parameters: {tuple(BEST_PARAM_SINGLE)}\n")
 
 
@@ -671,9 +671,12 @@ def comparison_single_subject():
             choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
 
     print(f"Model used: {MODEL_XP.__name__}")
-    for i, m in enumerate(MODELS):
+    print("-" * 10)
 
+    for i, m in enumerate(MODELS):
         print(f"BIC {m.__name__} = {bic_scores[i]:.3f}")
+
+    print()
 
 
 # Compute bic scores for evey model for our initial set of data
@@ -734,6 +737,8 @@ def data_confusion_matrix(models, n_sets):
 
 # Data
 N_SETS_CONF = 100
+SEED_CONF = 123
+np.random.seed(SEED_CONF)
 CONF_MT = data_confusion_matrix(models=MODELS, n_sets=N_SETS_CONF)
 
 # Plot
@@ -747,8 +752,11 @@ stats.classification(CONF_MT, model_names=MODEL_NAMES)
 # Fake experiment  =====================================================
 # ======================================================================
 
+print("Fake experiment")
 
 # Get data
+SEED_HET_POP = 1234
+np.random.seed(SEED_HET_POP)
 PARAM_HET_POP = \
     [
         [np.random.uniform(*b) for b in MODEL_XP.xp_bounds]
