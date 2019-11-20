@@ -41,6 +41,10 @@ def format_p(p, threshold=0.05):
 
 def correlation_recovery(data):
 
+    print("\n" + "=" * 10)
+    print("\nStatistical analysis for the parameter recovery")
+    print("=" * 10 + "\n")
+
     keys = sorted(data.keys())
     n_keys = len(keys)
 
@@ -78,8 +82,8 @@ def freq_and_err(data):
 
 
 def classification(obs, model_names):
-
-    print("Stats classification")
+    print("\n" + "=" * 10)
+    print("Statistic analysis for the classification")
     print("=" * 10 + "\n")
 
     for i in range(len(obs)):

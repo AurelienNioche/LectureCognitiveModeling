@@ -701,7 +701,7 @@ def data_confusion_matrix(models, n_sets):
 
 
 # Data
-N_SETS_CONF = 30
+N_SETS_CONF = 100
 CONF_MT = data_confusion_matrix(models=MODELS, n_sets=N_SETS_CONF)
 
 # Plot
