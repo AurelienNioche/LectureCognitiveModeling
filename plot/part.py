@@ -78,6 +78,7 @@ def plot_bar_best_metric(ax, freq, y_err,
 
     # Get the ticks
     x_pos = np.arange(len(freq))
+    ax.set_xticks(x_pos)
     ax.set_xticklabels(x_tick_labels)
 
     # Plot the bar
@@ -104,10 +105,10 @@ def plot_bar_best_metric(ax, freq, y_err,
     ax.set_title(title)
 
 
-def plot_model_metric(metrics, ax, y_label, x_tick_labels, title):
+def plot_scatter_metric(data, ax, y_label, x_tick_labels, title):
 
     # Extract from data...
-    n = metrics.shape[-1]
+    n = data.shape[-1]
 
     # Colors
     colors = np.array([f"C{i}" for i in range(n)])
@@ -125,7 +126,7 @@ def plot_model_metric(metrics, ax, y_label, x_tick_labels, title):
     for i in range(n):
 
         # For every value
-        for v in metrics[:, i]:
+        for v in data[:, i]:
 
             # Add value to the boxplot container
             values_box_plot[i].append(v)

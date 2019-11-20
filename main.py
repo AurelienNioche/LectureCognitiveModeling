@@ -32,7 +32,7 @@ T = 500
 N_SUBJECTS = 30
 
 # ======================================================================
-# Design your model(s) but also competitive models =====================
+# Design the models  ===================================================
 # ======================================================================
 
 
@@ -223,19 +223,21 @@ def run_simulation(seed, agent_model, param=()):
     return choices, successes
 
 
-# Get data ----------------------------------------------------
-SEED_XP = 0
+# We will experiment with Rescola-Wagner
 MODEL_XP = RW
-PARAM_XP = (0.1, 0.1)
-CHOICES_XP, SUCCESSES_XP = \
-    run_simulation(agent_model=RW, param=PARAM_XP, seed=SEED_XP)
+
+# Get data ----------------------------------------------------
+SEED_SINGLE = 0
+PARAM_SINGLE = (0.1, 0.1)
+CHOICES_SINGLE, SUCCESSES_SINGLE = \
+    run_simulation(agent_model=RW, param=PARAM_SINGLE, seed=SEED_SINGLE)
 
 # Plot --------------------------------------------------------
 # Begin by the more basic possible
-plot.behavior_basic(choices=CHOICES_XP, successes=SUCCESSES_XP)
+plot.behavior_single_basic(choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
 
 # ...then maybe you can do better
-plot.behavior_average(choices=CHOICES_XP, successes=SUCCESSES_XP)
+plot.behavior_single_average(choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
 
 
 # =======================================================================
@@ -272,13 +274,16 @@ def latent_variables_rw(choices, successes, param):
 
 
 # Get the data
-Q_VALUES, P_CHOICES = latent_variables_rw(choices=CHOICES_XP,
-                                          successes=SUCCESSES_XP,
-                                          param=PARAM_XP)
+Q_VALUES_SINGLE, P_CHOICES_SINGLE = \
+    latent_variables_rw(choices=CHOICES_SINGLE,
+                        successes=SUCCESSES_SINGLE,
+                        param=PARAM_SINGLE)
 
 # Plot
-plot.latent_variables_rw(q_values=Q_VALUES, p_choices=P_CHOICES,
-                         successes=SUCCESSES_XP, choices=CHOICES_XP)
+plot.latent_variables_rw_and_behavior_single(q_values=Q_VALUES_SINGLE,
+                                             p_choices=P_CHOICES_SINGLE,
+                                             choices=CHOICES_SINGLE,
+                                             successes=SUCCESSES_SINGLE)
 
 
 # ========================================================================
@@ -286,47 +291,68 @@ plot.latent_variables_rw(q_values=Q_VALUES, p_choices=P_CHOICES,
 # ========================================================================
 
 @use_pickle
-def run_sim_pop_rw(model, param, n_subjects):
+def run_sim_pop(model, param, n_subjects):
+
+    # Data containers
+    choices = np.zeros((n_subjects, T), dtype=int)
+    successes = np.zeros((n_subjects, T), dtype=bool)
+
+    for i in range(n_subjects):
+
+        # Get choices and successes
+        c, s = run_simulation(seed=i,
+                              agent_model=model,
+                              param=param[i])
+
+        # Backup
+        choices[i] = c
+        successes[i] = s
+
+    return choices, successes
+
+
+@use_pickle
+def latent_variables_rw_pop(choices, successes, param):
 
     """
     Specific to RW
     """
 
+    n_subjects = len(choices)
+
     # Data containers
-    pop_q_values = np.zeros((n_subjects, T, N))
-    pop_p_choices = np.zeros((n_subjects, T, N))
-    pop_choices = np.zeros((n_subjects, T), dtype=int)
-    pop_successes = np.zeros((n_subjects, T), dtype=bool)
+    q_values = np.zeros((n_subjects, T, N))
+    p_choices = np.zeros((n_subjects, T, N))
 
     for i in range(n_subjects):
 
-        # Get choices and successes
-        choices, successes \
-            = run_simulation(seed=i, agent_model=model, param=param)
-
         # Get q-values and choice probabilities
-        q_values, p_choices \
-            = latent_variables_rw(
-                choices=choices, successes=successes,
-                param=param)
+        qv, pc = latent_variables_rw(choices=choices[i],
+                                     successes=successes[i],
+                                     param=param[i])
 
         # Backup
-        pop_q_values[i] = q_values
-        pop_p_choices[i] = p_choices
-        pop_choices[i] = choices
-        pop_successes[i] = successes
+        q_values[i] = qv
+        p_choices[i] = pc
 
-    return pop_q_values, pop_p_choices, pop_choices, pop_successes
+    return q_values, p_choices
 
 
 # Get the data
-POP_Q_VALUES, POP_P_CHOICES, POP_CHOICES, POP_SUCCESSES = \
-    run_sim_pop_rw(model=RW, param=PARAM_XP, n_subjects=N_SUBJECTS)
+PARAM_HOM_POP = [PARAM_SINGLE for _ in range(N_SUBJECTS)]
+
+CHOICES_HOM_POP, SUCCESSES_HOM_POP = \
+    run_sim_pop(model=RW, param=PARAM_HOM_POP, n_subjects=N_SUBJECTS)
+
+Q_VALUES_HOM_POP, P_CHOICES_HOM_POP = \
+    latent_variables_rw_pop(choices=CHOICES_HOM_POP,
+                            successes=SUCCESSES_HOM_POP,
+                            param=PARAM_HOM_POP)
 
 # Plot
-plot.pop_latent_variables_rw(
-    q_values=POP_Q_VALUES, p_choices=POP_P_CHOICES,
-    choices=POP_CHOICES, successes=POP_SUCCESSES)
+plot.latent_variables_rw_and_behavior_pop(
+    q_values=Q_VALUES_HOM_POP, p_choices=P_CHOICES_HOM_POP,
+    choices=CHOICES_HOM_POP, successes=SUCCESSES_HOM_POP)
 
 
 # ========================================================================
@@ -413,8 +439,8 @@ def get_best_param():
 
     # Create optimizer
     opt = BanditOptimizer(
-        choices=CHOICES_XP,
-        successes=SUCCESSES_XP,
+        choices=CHOICES_SINGLE,
+        successes=SUCCESSES_SINGLE,
         model=RW
     )
 
@@ -424,52 +450,56 @@ def get_best_param():
 
 
 # Get the best-fit parameters
-BEST_PARAM = get_best_param()
-print(f"'True' parameters: {PARAM_XP}")
-print(f"Best-fit parameters: {tuple(BEST_PARAM)}\n")
+BEST_PARAM_SINGLE = get_best_param()
+print(f"'True' parameters: {PARAM_SINGLE}")
+print(f"Best-fit parameters: {tuple(BEST_PARAM_SINGLE)}\n")
 
 
 # New simulation with best-fit parameters
-CHOICES_BF, SUCCESSES_BF = \
-    run_simulation(seed=SEED_XP + 1, agent_model=RW, param=BEST_PARAM)
+CHOICES_SINGLE_BF, SUCCESSES_FIST_BF = \
+    run_simulation(seed=SEED_SINGLE + 1, agent_model=RW, 
+                   param=BEST_PARAM_SINGLE)
 
 # Get the values of the latent variables
-Q_VALUES_BF, P_CHOICES_BF = \
-    latent_variables_rw(choices=CHOICES_BF, successes=SUCCESSES_BF,
-                        param=BEST_PARAM)
+Q_VALUES_SINGLE_BF, P_CHOICES_SINGLE_BF = \
+    latent_variables_rw(choices=CHOICES_SINGLE_BF,
+                        successes=SUCCESSES_FIST_BF,
+                        param=BEST_PARAM_SINGLE)
 
 # Plot
-plot.comparison_best_fit_rw(
-    q_values=Q_VALUES, p_choices=P_CHOICES,
-    choices=CHOICES_XP, successes=SUCCESSES_XP,
-    choices_bf=CHOICES_BF, successes_bf=SUCCESSES_BF,
-    q_values_bf=Q_VALUES_BF, p_choices_bf=P_CHOICES_BF)
+plot.comparison_best_fit_rw_single(
+    q_values=Q_VALUES_SINGLE, p_choices=P_CHOICES_SINGLE,
+    choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE,
+    choices_bf=CHOICES_SINGLE_BF, successes_bf=SUCCESSES_FIST_BF,
+    q_values_bf=Q_VALUES_SINGLE_BF, p_choices_bf=P_CHOICES_SINGLE_BF)
 
 
 # Population --------------------------------------------------------------
 
-def data_pop_comparison_best_fit():
+# Define as parameter the best-fit parameter for the single agent
+PARAM_HOM_POP_BF = [BEST_PARAM_SINGLE for _ in range(N_SUBJECTS)]
 
-    # Run simulations with INITIAL parameters
-    data_init = \
-        run_sim_pop_rw(model=RW, param=PARAM_XP, n_subjects=N_SUBJECTS)
+# Get behavior for best-fit
+CHOICES_HOM_POP_BF, SUCCESSES_HOM_POP_BF = \
+    run_sim_pop(model=RW, param=PARAM_HOM_POP, n_subjects=N_SUBJECTS)
 
-    # Run new simulation with BEST parameters
-    data_best = \
-        run_sim_pop_rw(model=RW, param=BEST_PARAM, n_subjects=N_SUBJECTS)
-
-    return data_init, data_best
-
-
-# Get data
-DATA_INIT, DATA_BEST = data_pop_comparison_best_fit()
+# Get latent variables values
+Q_VALUES_HOM_POP_BF, P_CHOICES_HOM_POP_BF = \
+    latent_variables_rw_pop(choices=CHOICES_HOM_POP_BF,
+                            successes=SUCCESSES_HOM_POP_BF,
+                            param=PARAM_HOM_POP_BF)
 
 # Plot
-plot.pop_comparison_best_fit(data_init=DATA_INIT, data_best=DATA_BEST)
+plot.comparison_best_fit_rw_pop(
+    choices=CHOICES_HOM_POP, choices_bf=CHOICES_HOM_POP_BF,
+    successes=SUCCESSES_HOM_POP, successes_bf=SUCCESSES_HOM_POP_BF,
+    q_values=Q_VALUES_HOM_POP, q_values_bf=Q_VALUES_HOM_POP_BF,
+    p_choices=P_CHOICES_HOM_POP, p_choices_bf=P_CHOICES_HOM_POP_BF
+)
 
 
 # =========================================================================
-# parameter space exploration =============================================
+# Parameter space exploration =============================================
 # =========================================================================
 
 @use_pickle
@@ -478,7 +508,7 @@ def parameter_space_exploration(model, choices, successes, grid_size=20):
     """
     Compute likelihood for several combinations of parameters
     (using grid exploration)
-    :param model: DM model with 2 free paramters
+    :param model: DM model with 2 free parameters
     :param choices: array-like
     :param successes: array-like
     :param grid_size: int
@@ -526,14 +556,14 @@ def parameter_space_exploration(model, choices, successes, grid_size=20):
 
 
 # Get data
-PARAM_SPACE_EXPLO = parameter_space_exploration(
+PARAM_SPACE_EXPLORATION = parameter_space_exploration(
     model=RW,
-    choices=CHOICES_XP,
-    successes=SUCCESSES_XP)
+    choices=CHOICES_SINGLE,
+    successes=SUCCESSES_SINGLE)
 
 # Plot
 plot.parameter_space_exploration(
-    PARAM_SPACE_EXPLO,
+    PARAM_SPACE_EXPLORATION,
     labels=RW.param_labels,
     title='Parameter space exploration')
 
@@ -601,7 +631,7 @@ def bic(ll, k, n_iteration):
     return -2 * ll + k * np.log(n_iteration)
 
 
-def optimize_and_compare(choices, successes):
+def optimize_and_compare_single(choices, successes):
 
     n_models = len(MODELS)
     bic_scores = np.zeros(n_models)
@@ -637,7 +667,8 @@ def optimize_and_compare(choices, successes):
 def comparison_single_subject():
 
     best_params, lls, bic_scores = \
-        optimize_and_compare(choices=CHOICES_XP, successes=SUCCESSES_XP)
+        optimize_and_compare_single(
+            choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
 
     print(f"Model used: {MODEL_XP.__name__}")
     for i, m in enumerate(MODELS):
@@ -686,7 +717,8 @@ def data_confusion_matrix(models, n_sets):
 
             # Compute bic scores
             best_params, lls, bic_scores = \
-                optimize_and_compare(choices=choices, successes=successes)
+                optimize_and_compare_single(choices=choices,
+                                            successes=successes)
 
             # Get minimum value for bic (min => best)
             min_ = np.min(bic_scores)
@@ -715,42 +747,76 @@ stats.classification(CONF_MT, model_names=MODEL_NAMES)
 # Fake experiment  =====================================================
 # ======================================================================
 
-@use_pickle
-def data_fake_xp(model, n_subjects):
 
-    assert hasattr(model, 'fit_bounds'), \
-        f"{model.__name__} has not 'fit_bounds' attribute"
+# Get data
+PARAM_HET_POP = \
+    [
+        [np.random.uniform(*b) for b in MODEL_XP.xp_bounds]
+        for _ in range(N_SUBJECTS)
+    ]
+
+CHOICES_HET_POP, SUCCESSES_HET_POP = \
+    run_sim_pop(model=MODEL_XP, n_subjects=N_SUBJECTS, param=PARAM_HET_POP)
+
+# Plot behavior
+plot.behavior_pop(choices=CHOICES_HET_POP, successes=SUCCESSES_HET_POP,
+                  n_option=N)
+
+
+@use_pickle
+def optimize_and_compare_pop(choices, successes):
+
+    n_subjects = len(choices)
 
     # Data containers
-    choices = np.zeros((n_subjects, T), dtype=int)
-    successes = np.zeros((n_subjects, T), dtype=bool)
-    bic_scores = np.zeros((n_subjects, len(MODELS)))
+    best_parameters = np.zeros(n_subjects, dtype=object)
     lls = np.zeros((n_subjects, len(MODELS)))
-    bp = np.zeros(n_subjects, dtype=object)
+    bic_scores = np.zeros((n_subjects, len(MODELS)))
 
     # Loop over subjects
     for i in tqdm(range(n_subjects)):
 
-        # Select parameters (limited range)
-        param = [np.random.uniform(*b) for b in model.xp_bounds]
-
-        # Simulate
-        choices[i], successes[i] = \
-            run_simulation(seed=i, agent_model=model, param=param)
-
         # Optimize and compare
-        bp[i], lls[i], bic_scores[i] = \
-            optimize_and_compare(choices=choices[i], successes=successes[i])
+        best_parameters[i], lls[i], bic_scores[i] = \
+            optimize_and_compare_single(choices=choices[i],
+                                        successes=successes[i])
 
     # Freq and confidence intervals for the barplot
     lls_freq, lls_err = stats.freq_and_err(lls)
     bic_freq, bic_err = stats.freq_and_err(-bic_scores)
 
+    return lls, lls_freq, lls_err,\
+        bic_scores, bic_freq, bic_err, \
+        best_parameters
+
+
+LLS_HET, LLS_FREQ_HET, LLS_ERR_HET, \
+    BIC_HET, BIC_FQ_HT, BIC_ERR_HET,\
+    BEST_PARM_HET = \
+    optimize_and_compare_pop(choices=CHOICES_HET_POP,
+                             successes=SUCCESSES_HET_POP)
+
+plot.model_comparison(
+    lls=LLS_HET,
+    lls_freq=LLS_FREQ_HET,
+    lls_err=LLS_ERR_HET,
+    bic_scores=BIC_HET,
+    bic_freq=BIC_FQ_HT,
+    bic_err=BIC_ERR_HET,
+    model_names=MODEL_NAMES
+)
+
+
+@use_pickle
+def post_hoc_sim(
+        best_parameters,
+        model_xp, bic_freq, n_subjects):
+
     # Look at the best model
     best_model_idx = int(np.argmax(bic_freq))
 
     # Assume that it should be the one that you used to simulate
-    assert best_model_idx == MODELS.index(model)
+    assert model_xp == MODELS[best_model_idx]
 
     # Simulate with best parameters
     choices_bf = np.zeros((n_subjects, T), dtype=int)
@@ -758,26 +824,46 @@ def data_fake_xp(model, n_subjects):
 
     for i in tqdm(range(n_subjects)):
 
-        param = bp[i][best_model_idx]
+        param = best_parameters[i][best_model_idx]
         choices_bf[i], successes_bf[i] = run_simulation(
             seed=i+1,
-            agent_model=model, param=param)
+            agent_model=model_xp, param=param)
 
-    return {
-        "choices": choices,
-        "successes": successes,
-        "lls": lls,
-        "bic_scores": bic_scores,
-        "bic_freq": bic_freq,
-        "bic_err": bic_err,
-        "lls_freq": lls_freq,
-        "lls_err": lls_err,
-        "choices_bf": choices_bf,
-        "successes_bf": successes_bf}
+    return choices_bf, successes_bf
 
 
-# Get _data
-DATA_XP = data_fake_xp(model=MODEL_XP, n_subjects=N_SUBJECTS)
+# Look at the best model
+BEST_MODEL_IDX = int(np.argmax(BIC_FQ_HT))
 
-# Plot
-plot.fake_xp(model_names=MODEL_NAMES, n_option=N, **DATA_XP)
+# Assume that it should be the one that you used to simulate
+assert MODEL_XP == MODELS[BEST_MODEL_IDX]
+
+# Retrieve parameters for best model
+PARAM_HET_BF = \
+    [
+        BEST_PARM_HET[i][BEST_MODEL_IDX]
+        for i in range(N_SUBJECTS)
+    ]
+
+# Plot best parameters distribution
+plot.distribution_best_parameters(np.asarray(PARAM_HET_BF),
+                                  parameter_names=MODEL_XP.param_labels)
+
+# Get behavior for best-fit
+CHOICES_HET_BF, SUCCESSES_HET_BF = \
+    run_sim_pop(model=RW, param=PARAM_HET_BF, n_subjects=N_SUBJECTS)
+
+# Get latent variables values
+Q_VALUES_HET_BF, P_CHOICES_HET_BF = \
+    latent_variables_rw_pop(choices=CHOICES_HET_BF,
+                            successes=SUCCESSES_HET_BF,
+                            param=PARAM_HET_BF)
+
+plot.post_hoc_sim(
+    choices=CHOICES_HET_POP,
+    successes=SUCCESSES_HET_POP,
+    choices_bf=CHOICES_HET_BF,
+    successes_bf=SUCCESSES_HET_BF,
+    q_values_bf=Q_VALUES_HET_BF,
+    p_choices_bf=P_CHOICES_HET_BF
+)

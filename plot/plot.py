@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from plot.part import plot_mean_std, scatter_binary, \
-    plot_bar_best_metric, plot_model_metric
+    plot_bar_best_metric, plot_scatter_metric
 from plot.utils import custom_ax
 from stats.stats import rolling_mean
 
@@ -67,7 +67,7 @@ def softmax_temperature(param_values=(0.05, 0.25, 0.5, 0.75)):
     plt.plot()
 
 
-def behavior_basic(choices, successes, n_option=2):
+def behavior_single_basic(choices, successes, n_option=2):
 
     # Create figure and axes
     n_rows = 2
@@ -92,9 +92,9 @@ def behavior_basic(choices, successes, n_option=2):
     plt.show()
 
 
-def behavior_average(choices, successes,
-                     n_option=2,
-                     axes=None):
+def behavior_single_average(choices, successes,
+                            n_option=2,
+                            axes=None):
 
     n_rows = 4
     if axes is None:
@@ -141,8 +141,9 @@ def behavior_average(choices, successes,
         plt.show()
 
 
-def latent_variables_rw(q_values, p_choices, choices, successes,
-                        axes=None):
+def latent_variables_rw_and_behavior_single(
+        q_values, p_choices, choices, successes,
+        axes=None):
 
     if axes is None:
         n_rows = 6
@@ -170,21 +171,93 @@ def latent_variables_rw(q_values, p_choices, choices, successes,
               n_iteration=len(p_choices))
 
     # Plot average behavior
-    behavior_average(choices=choices, successes=successes,
-                     axes=axes[2:])
+    behavior_single_average(choices=choices, successes=successes,
+                            axes=axes[2:])
 
     if show:
         plt.tight_layout()
         plt.show()
 
 
-def pop_latent_variables_rw(
-        q_values, p_choices, choices, successes, axes=None):
+def comparison_best_fit_rw_single(
+        q_values,
+        p_choices,
+        choices,
+        successes,
+        q_values_bf,
+        p_choices_bf,
+        choices_bf,
+        successes_bf
+):
 
+    n_cols = 2
+    n_rows = 6
+    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
+                             figsize=(4*n_cols,  2.5*n_rows))
+
+    titles = {
+        "Initial": axes[0, 0],
+        "Best-fit": axes[0, 1]
+    }
+    for title, ax in titles.items():
+        ax.text(0.5, 1.2, title,
+                horizontalalignment='center',
+                transform=ax.transAxes,
+                size=15, weight='bold')
+
+    # Here for comparison
+    latent_variables_rw_and_behavior_single(
+        q_values=q_values,
+        p_choices=p_choices,
+        choices=choices,
+        successes=successes,
+        axes=axes[:, 0])
+
+    # New simulation with best fit parameters
+    latent_variables_rw_and_behavior_single(
+        q_values=q_values_bf,
+        p_choices=p_choices_bf,
+        choices=choices_bf,
+        successes=successes_bf,
+        axes=axes[:, 1])
+
+    plt.tight_layout()
+    plt.show()
+
+
+def behavior_pop(choices, successes, n_option, axes=None):
     if axes is None:
-        n_rows = 4
-        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
         show = True
+        n_rows = 2
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
+    else:
+        show = False
+
+    # Plot average
+    ax = axes[0]
+    for i in range(n_option):
+        y = choices == i
+        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
+    custom_ax(ax=ax, y_label='freq. choice', title="Choices",
+              n_iteration=len(choices))
+
+    # Plot successes
+    ax = axes[1]
+    plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
+    custom_ax(ax=ax, y_label='freq. success', title="Successes",
+              legend=False,
+              n_iteration=len(successes))
+
+    if show:
+        plt.tight_layout()
+        plt.show()
+
+
+def latent_variables_rw_pop(q_values, p_choices, axes=None):
+    if axes is None:
+        show = True
+        n_rows = 2
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
     else:
         show = False
 
@@ -210,27 +283,40 @@ def pop_latent_variables_rw(
     custom_ax(ax=ax, y_label='p', title='Probabilities',
               n_iteration=len(p_choices))
 
-    # Plot choice average
-    ax = axes[2]
-    for i in range(n_option):
-        y = choices == i
-        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
-    custom_ax(ax=ax, y_label='freq. choice', title="Choices",
-              n_iteration=len(choices))
+    if show:
+        plt.tight_layout()
+        plt.show()
 
-    # Plot success average
-    ax = axes[3]
-    plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
-    custom_ax(ax=ax, y_label='freq. success', title="Successes",
-              legend=False,
-              n_iteration=len(successes))
+
+def latent_variables_rw_and_behavior_pop(
+        q_values, p_choices, choices, successes, axes=None):
+
+    if axes is None:
+        n_rows = 4
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
+        show = True
+    else:
+        show = False
+
+    # Extract from data
+    n_option = q_values.shape[-1]
+
+    # Plot q-values and choice probabilities
+    latent_variables_rw_pop(q_values=q_values, p_choices=p_choices,
+                            axes=axes[:2])
+
+    # Plot choice average and success average
+    behavior_pop(choices=choices, successes=successes, n_option=n_option,
+                 axes=axes[2:])
 
     if show:
         plt.tight_layout()
         plt.show()
 
 
-def pop_comparison_best_fit(data_init, data_best):
+def comparison_best_fit_rw_pop(
+        q_values, p_choices, choices, successes,
+        q_values_bf, p_choices_bf, choices_bf, successes_bf):
 
     n_cols = 2
     n_rows = 4
@@ -248,8 +334,7 @@ def pop_comparison_best_fit(data_init, data_best):
                 size=15, weight='bold')
 
     # Here for comparison
-    q_values, p_choices, choices, successes = data_init
-    pop_latent_variables_rw(
+    latent_variables_rw_and_behavior_pop(
         q_values=q_values,
         p_choices=p_choices,
         choices=choices,
@@ -257,12 +342,11 @@ def pop_comparison_best_fit(data_init, data_best):
         axes=axes[:, 0])
 
     # Data with best fit parameters
-    q_values, p_choices, choices, successes = data_best
-    pop_latent_variables_rw(
-        q_values=q_values,
-        p_choices=p_choices,
-        choices=choices,
-        successes=successes,
+    latent_variables_rw_and_behavior_pop(
+        q_values=q_values_bf,
+        p_choices=p_choices_bf,
+        choices=choices_bf,
+        successes=successes_bf,
         axes=axes[:, 1])
 
     plt.tight_layout()
@@ -415,124 +499,84 @@ def confusion_matrix(data, tick_labels,
     plt.show()
 
 
-def fake_xp(choices, successes,
-            choices_bf, successes_bf,
-            lls,
-            bic_scores,
-            lls_freq,
-            lls_err,
-            bic_freq,
-            bic_err,
-            n_option,
-            model_names):
+def model_comparison(
+        lls,
+        bic_scores,
+        lls_freq,
+        lls_err,
+        bic_freq,
+        bic_err,
+        model_names):
 
-    n_rows = 8
+    n_rows = 4
     fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
 
-    # Plot average
-    ax = axes[0]
-    for i in range(n_option):
-        y = choices == i
-        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
-    custom_ax(ax=ax, y_label='freq. choice', title="Choices",
-              n_iteration=len(choices))
-
-    # Plot successes
-    ax = axes[1]
-    plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
-    custom_ax(ax=ax, y_label='freq. success', title="Successes",
-              legend=False,
-              n_iteration=len(successes))
-
     # Plot LLS - scatterplot + boxplot
-    ax = axes[2]
-    plot_model_metric(ax=ax, metrics=lls,
-                      title="Log-Likelihood Sums",
-                      y_label="LLS",
-                      x_tick_labels=model_names)
+    ax = axes[0]
+    plot_scatter_metric(ax=ax, data=lls,
+                        title="Log-Likelihood Sums",
+                        y_label="LLS",
+                        x_tick_labels=model_names)
 
     # Plot LLS - barplot
-    ax = axes[3]
+    ax = axes[1]
     plot_bar_best_metric(ax=ax, freq=lls_freq, y_err=lls_err,
                          y_label='Highest LLS (freq.)',
                          title="Highest LLS",
                          x_tick_labels=model_names)
 
     # Plot BIC - scatterplot + boxplot
-    ax = axes[4]
-    plot_model_metric(ax=ax, metrics=bic_scores,
-                      title="BIC Scores",
-                      y_label="BIC",
-                      x_tick_labels=model_names)
+    ax = axes[2]
+    plot_scatter_metric(ax=ax, data=bic_scores,
+                        title="BIC Scores",
+                        y_label="BIC",
+                        x_tick_labels=model_names)
     ax.invert_yaxis()
 
     # Plot BIC - barplot
-    ax = axes[5]
+    ax = axes[3]
     plot_bar_best_metric(ax=ax, freq=bic_freq, y_err=bic_err,
                          y_label='Lowest BIC (freq.)',
                          title="Lowest BIC",
                          x_tick_labels=model_names)
 
-    # Plot best-fit choice average
-    ax = axes[6]
-    for i in range(n_option):
-        y = choices_bf == i
-        plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
-    custom_ax(ax=ax, y_label='freq. choice', title="Choices Best-fit",
-              n_iteration=len(choices_bf))
+    plt.tight_layout()
+    plt.show()
 
-    # Plot best-fit success average
-    ax = axes[7]
-    plot_mean_std(ax=ax, y=np.asarray(successes_bf, dtype=int))
-    custom_ax(ax=ax, y_label='freq. success', title="Successes Best-fit",
-              legend=False,
-              n_iteration=len(successes_bf))
+
+def post_hoc_sim(
+            choices, successes,
+            q_values_bf, p_choices_bf,
+            choices_bf, successes_bf):
+
+    n_option = q_values_bf.shape[-1]
+
+    n_rows = 6
+    fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5 * n_rows))
+
+    behavior_pop(choices=choices, successes=successes,
+                 n_option=n_option,
+                 axes=axes[:2]
+                 )
+
+    behavior_pop(choices=choices_bf, successes=successes_bf,
+                 n_option=n_option,
+                 axes=axes[2:4])
+
+    latent_variables_rw_pop(
+        q_values=q_values_bf, p_choices=p_choices_bf,
+        axes=axes[4:])
 
     plt.tight_layout()
     plt.show()
 
 
-def comparison_best_fit_rw(
-        q_values,
-        p_choices,
-        choices,
-        successes,
-        q_values_bf,
-        p_choices_bf,
-        choices_bf,
-        successes_bf
-):
+def distribution_best_parameters(best_parameters, parameter_names):
 
-    n_cols = 2
-    n_rows = 6
-    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
-                             figsize=(4*n_cols,  2.5*n_rows))
-
-    titles = {
-        "Initial": axes[0, 0],
-        "Best-fit": axes[0, 1]
-    }
-    for title, ax in titles.items():
-        ax.text(0.5, 1.2, title,
-                horizontalalignment='center',
-                transform=ax.transAxes,
-                size=15, weight='bold')
-
-    # Here for comparison
-    latent_variables_rw(
-        q_values=q_values,
-        p_choices=p_choices,
-        choices=choices,
-        successes=successes,
-        axes=axes[:, 0])
-
-    # New simulation with best fit parameters
-    latent_variables_rw(
-        q_values=q_values_bf,
-        p_choices=p_choices_bf,
-        choices=choices_bf,
-        successes=successes_bf,
-        axes=axes[:, 1])
-
+    fig, ax = plt.subplots(nrows=1, figsize=(4, 2.5))
+    plot_scatter_metric(ax=ax, data=best_parameters,
+                        title="Dist. best parameters",
+                        y_label="Value",
+                        x_tick_labels=parameter_names)
     plt.tight_layout()
     plt.show()

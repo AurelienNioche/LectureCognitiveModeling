@@ -2,9 +2,6 @@ import os
 import pickle
 
 
-USE_PICKLE = True
-
-
 BKP_FOLDER = os.path.join("bkp", "run")
 os.makedirs(BKP_FOLDER, exist_ok=True)
 
@@ -13,7 +10,7 @@ def use_pickle(func):
 
     """
     Decorator that does the following:
-    * If a pickle file with the name of '<func name>_<args>_<kwargs>' exists,
+    * If a pickle file corresponding to the call exists,
     it load the data from it instead of calling the function.
     * If no such pickle file exists, it calls 'func',
     creates the file and saves the output in it
@@ -21,43 +18,27 @@ def use_pickle(func):
     :return: output of func(*args, **kwargs)
     """
 
-    def _clean_string(obj):
-        return str(obj).replace(' ', '_').replace('{', '') \
-            .replace('}', '').replace("'", '').replace(':', '') \
-            .replace(',', '').replace('(', '').replace(')', '')
-
-    def _dic2string(dic):
-        new_dic = {
-            k: v for k, v in dic.items()
-            if not (hasattr(v, '__len__') and len(v) > 10)
-        }
-
-        return _clean_string(new_dic)
-
-    def _list2string(lst):
-
-        new_lst = [
-            v for v in lst
-            if not (hasattr(v, '__getitem__') and len(v) > 10)
-        ]
-
-        return _clean_string(new_lst)
-
     def call_func(*args, **kwargs):
 
-        file_name = f"{func.__name__}_" \
-                    f"{_list2string(args)}_" \
-                    f"{_dic2string(kwargs)}" \
-                    f".p"
+        info_file = os.path.join(BKP_FOLDER, f"{func.__name__}_info.p")
 
-        bkp_file = os.path.join(BKP_FOLDER, file_name)
+        key = kwargs.copy().update({'args': args})
 
-        if os.path.exists(bkp_file) and USE_PICKLE:
-            data = pickle.load(open(bkp_file, 'rb'))
+        if os.path.exists(info_file):
 
+            info = pickle.load(open(info_file, 'rb'))
+            if key in info.keys() and os.path.exists(info[key]):
+                data = pickle.load(open(info[key], 'rb'))
+                return data
         else:
-            data = func(*args, **kwargs)
-            pickle.dump(data, open(bkp_file, 'wb'))
+            info = {'idx': -1}
+
+        data = func(*args, **kwargs)
+
+        bkp_file = os.path.join(BKP_FOLDER,
+                                f"{func.__name__}{info['idx'] + 1}.p")
+        pickle.dump(data, open(bkp_file, 'wb'))
+        pickle.dump(info, open(info_file, 'wb'))
 
         return data
 
