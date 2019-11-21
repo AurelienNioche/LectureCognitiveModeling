@@ -10,14 +10,14 @@ Main claims:
 
 ### 1.1 Task definition
 
-#### Goal
+**Goal**
 
 - Check the adequacy with the question you want to reply to
 - Select adequate characteristics (i.e., enough time-steps) 
 
-### 1.2 ModelS definition
+### 1.2 Models definition
 
-#### Goal
+**Goal**
 
 - Select/Define which aspect(s) you want to model
 - Model alternatives
@@ -30,7 +30,7 @@ Main claims:
 
 ### 2.0 Represent effect of free parameters on behavior
 
-#### Goals
+**Goal**
 
 - Isolate the effect of each parameter
 - Notice dynamics that may differ from initial intuitions (e.g., non linear)
@@ -42,7 +42,7 @@ Main claims:
 
 ### 2.1 Simulate a single agent [RW only]
 
-#### Goals
+**Goal**
 
 - Have a first insight into the expected behavior
 - Be sure that your metrics are adapted
@@ -54,7 +54,7 @@ Main claims:
 
 ### 2.2 Analyse latent variables
 
-#### Goals
+**Goal**
 
 - Observe dynamics of your model
 
@@ -64,7 +64,7 @@ Main claims:
 
 ### 2.3 Simulate a population of agent
 
-#### Goals
+**Goal**
 
 - Evaluate the 'noise' of your behavior by using constant parametrisation
 - Get a picture of your expected behavior under the best scenario 
@@ -84,7 +84,7 @@ assuming that your model is correct
 
 ### 3.1 In a single agent
 
-#### Goals
+**Goal**
 
 - Be sure that in the simplest case (single subject), 
 you retrieve close parameters
@@ -95,7 +95,7 @@ you retrieve close parameters
 
 ### 3.2 In an homogeneous population
 
-#### Goals
+**Goal**
 
 - Generalize what you observe with a single subject to a population, 
 maintaining constant the parameter set 
@@ -106,7 +106,7 @@ maintaining constant the parameter set
 
 ### 3.3 Exploration of objective function values over parameter space
 
-#### Goals
+**Goal**
 
 - Observe the behavior of your objective function over the parameter space
 - Notify the local minima 
@@ -117,7 +117,7 @@ maintaining constant the parameter set
 
 ### 3.4 Statistical approach
 
-#### Goals
+**Goal**
 
 - Test parameter recovery for a large (enough) set of parameters
 - Have a metric of the quality of your parameter recovery (Pearson's r),
@@ -129,7 +129,7 @@ including statistical assessment of the relevancy
 
 ## 4. Model comparison
 
-#### Goals
+**Goal**
 
 - Ensure that each model, when used for simulating, is selected as the 
 best model
@@ -141,7 +141,7 @@ best model
 
 ## 5. Fake experiment
 
-#### Goals
+**Goal**
 
 - Have an overview about what the results of your experiment could look like,
 under the assumption that you get the best model, 

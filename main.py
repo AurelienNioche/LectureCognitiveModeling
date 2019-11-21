@@ -91,11 +91,14 @@ class WSLS(Random):
         p_apply_rule = 1 - self.epsilon
         p_random = self.epsilon / N
         if self.r:
-            p[self.c] = p_apply_rule + p_random
             p[self.options != self.c] = p_random
+            p[self.c] = 1 - np.sum(p)  # p_apply_rule + p_random
         else:
-            p[self.options != self.c] = p_apply_rule + p_random
-            p[self.c] = p_random
+            p[self.options != self.c] = p_apply_rule/(N-1) + p_random
+            p[self.c] = 1 - np.sum(p)  # p_random
+
+        assert np.sum(p) == 1, \
+            f"c: {self.c}; r{self.r}: epsilon:{self.epsilon}; p:{p}; sum p {np.sum(p)}"
 
         return p
 
@@ -731,8 +734,8 @@ def comparison_single_subject():
     print(f"Model used: {MODEL_XP.__name__}")
     print("-" * 10)
 
-    for i, m in enumerate(MODELS):
-        print(f"BIC {m.__name__} = {bic_scores[i]:.3f}")
+    for i in range(len(MODELS)):
+        print(f"BIC {MODELS[i].__name__} = {bic_scores[i]:.3f}")
 
     print()
 
