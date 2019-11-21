@@ -612,7 +612,7 @@ PARAM_HOM_POP_BF = [BEST_PARAM_SINGLE for _ in range(N_SUBJECTS)]
 
 # Get behavior for best-fit
 CHOICES_HOM_POP_BF, SUCCESSES_HOM_POP_BF = \
-    run_sim_pop(model=RW, param=PARAM_HOM_POP, n_subjects=N_SUBJECTS)
+    run_sim_pop(model=RW, param=PARAM_HOM_POP_BF, n_subjects=N_SUBJECTS)
 
 # Get latent variables values
 Q_VALUES_HOM_POP_BF, P_CHOICES_HOM_POP_BF = \
