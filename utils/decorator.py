@@ -3,7 +3,6 @@ import pickle
 import numpy as np
 
 BKP_FOLDER = os.path.join("bkp", "run")
-os.makedirs(BKP_FOLDER, exist_ok=True)
 
 
 def use_pickle(func):
@@ -19,7 +18,7 @@ def use_pickle(func):
     """
 
     def file_name(suffix):
-        return os.path.join(BKP_FOLDER, f"{func.__name__}_{suffix}.p")
+        return os.path.join(BKP_FOLDER, f"{func.__name__}", f"{suffix}.p")
 
     def load(f_name):
         return pickle.load(open(f_name, 'rb'))
@@ -29,6 +28,9 @@ def use_pickle(func):
 
     def call_func(*args, **kwargs):
 
+        os.makedirs(os.path.join(BKP_FOLDER, f"{func.__name__}"),
+                    exist_ok=True)
+
         idx_file = file_name('idx')
 
         info = {k: v for k, v in kwargs.items()}
@@ -37,11 +39,11 @@ def use_pickle(func):
         if os.path.exists(idx_file):
 
             idx = load(idx_file)
-            for i in range(idx):
+            for i in range(idx+1):
 
                 info_loaded = load(file_name(f"{i}_info"))
-                # print("info", info)
-                # print("info loaded", info_loaded)
+
+                #  Compare 'info' and 'info_loaded'...
                 same = True
                 for k in info_loaded.keys():
                     try:
@@ -56,6 +58,7 @@ def use_pickle(func):
                             same = False
                             break
 
+                # ...if they are the sum, load from the associated datafile
                 if same:
                     data = load(file_name(f"{i}_data"))
                     return data

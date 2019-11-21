@@ -179,9 +179,62 @@ MODEL_NAMES = [m.__name__ for m in MODELS]
 # Study the effect of your parameters =============================
 # =================================================================
 
-# For RW only...
-plot.learning_rate(model=RW)
-plot.softmax_temperature()
+
+def rw_learning_rate_effect(param_values, n_iteration=100):
+
+    n_param_values = len(param_values)
+
+    values = np.zeros((n_iteration, n_param_values))
+
+    for i in range(n_param_values):
+        alpha = param_values[i]
+        agent = RW(
+            q_learning_rate=alpha,
+            q_temp=None)
+        for t in range(n_iteration):
+
+            values[t, i] = agent.q_values[0]
+            agent.learn(option=0, success=1)
+
+    return values
+
+
+# Get data
+PARAM_VALUES = (0.01, 0.1, 0.2, 0.3)
+Y_VALUES = rw_learning_rate_effect(PARAM_VALUES)
+
+# Plot
+plot.learning_rate(param_values=PARAM_VALUES, y_values=Y_VALUES)
+
+
+def rw_sofmax_temerature_effect(param_values,
+                                min_reward=0,
+                                max_reward=1):
+
+    max_diff = max_reward - min_reward
+    x_values = np.linspace(-max_diff, max_diff, 100)
+
+    n_x_values = len(x_values)
+    n_param_values = len(param_values)
+
+    y_values = np.zeros((len(x_values), n_param_values))
+
+    for i in range(n_param_values):
+        for j in range(n_x_values):
+            x = x_values[j]
+            tau = param_values[i]
+            y_values[j, i] = 1 / (1 + np.exp(-x/tau))
+
+    return x_values, y_values
+
+
+# Get data
+PARAM_VALUES = (0.05, 0.25, 0.5, 0.75)
+X_VALUES, Y_VALUES = rw_sofmax_temerature_effect(PARAM_VALUES)
+
+# Plot
+plot.softmax_temperature(param_values=PARAM_VALUES,
+                         x_values=X_VALUES, y_values=Y_VALUES)
 
 
 # =================================================================
@@ -234,10 +287,12 @@ CHOICES_SINGLE, SUCCESSES_SINGLE = \
 
 # Plot --------------------------------------------------------
 # Begin by the more basic possible
-plot.behavior_single_basic(choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
+plot.behavior_single_basic(choices=CHOICES_SINGLE,
+                           successes=SUCCESSES_SINGLE)
 
 # ...then maybe you can do better
-plot.behavior_single_average(choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE)
+plot.behavior_single_average(choices=CHOICES_SINGLE,
+                             successes=SUCCESSES_SINGLE)
 
 
 # =======================================================================
@@ -293,11 +348,13 @@ plot.latent_variables_rw_and_behavior_single(q_values=Q_VALUES_SINGLE,
 @use_pickle
 def run_sim_pop(model, param, n_subjects):
 
+    print(f"Running simulation for {n_subjects} agents...")
+
     # Data containers
     choices = np.zeros((n_subjects, T), dtype=int)
     successes = np.zeros((n_subjects, T), dtype=bool)
 
-    for i in range(n_subjects):
+    for i in tqdm(range(n_subjects)):
 
         # Get choices and successes
         c, s = run_simulation(seed=i,
@@ -359,6 +416,34 @@ plot.latent_variables_rw_and_behavior_pop(
 # Parameter optimization
 # ========================================================================
 
+
+def log_likelihood(model, param, choices, successes):
+
+    # Create the agent
+    agent = model(*param)
+
+    # Data container
+    ll = np.zeros(T)
+
+    # Simulate the task
+    for t in range(T):
+
+        # Get choice and success for t
+        c, s = choices[t], successes[t]
+
+        # Look at probability of choice
+        p_choice = agent.decision_rule()
+        p = p_choice[c]
+
+        # Compute log
+        ll[t] = np.log(p + EPS)
+
+        # Make agent learn
+        agent.learn(option=c, success=s)
+
+    return np.sum(ll)
+
+
 class BanditOptimizer:
 
     """
@@ -366,10 +451,8 @@ class BanditOptimizer:
     estimate the best-fit param
     """
 
-    def __init__(self,
-                 choices,
-                 successes,
-                 model):
+    def __init__(self, choices, successes, model):
+
         self.choices = choices
         self.successes = successes
         self.model = model
@@ -380,40 +463,16 @@ class BanditOptimizer:
         self.t = 0
 
     def objective(self, param):
-
-        n_iteration = len(self.choices)
-        if isinstance(param, type(None)):
-            assert self.model == Random
-            agent = self.model()
-        else:
-            agent = self.model(*param)
-
-        log_likelihood = np.zeros(n_iteration)
-
-        # Simulate the task
-        for t in range(n_iteration):
-            choice, success = self.choices[t], self.successes[t]
-
-            ps = agent.decision_rule()
-            p_choice = ps[choice]
-
-            log_likelihood[t] = np.log(p_choice + EPS)
-
-            # Make agent learn
-            agent.learn(option=choice, success=success)
-
-        log_likelihood_sum = np.sum(log_likelihood)
-        v = -log_likelihood_sum
-        return v
-
-    def _func(self, param):
-        return self.objective(param)
+        return - log_likelihood(model=self.model,
+                                choices=self.choices,
+                                successes=self.successes,
+                                param=param)
 
     def run(self):
 
         if self.model.fit_bounds:
             res = scipy.optimize.minimize(
-                fun=self._func,
+                fun=self.objective,
                 x0=np.full(len(self.model.fit_bounds), 0.5),
                 bounds=self.model.fit_bounds)
             assert res.success
@@ -423,8 +482,8 @@ class BanditOptimizer:
 
         else:
             assert self.model == Random
-            best_param = None
-            best_value = self.objective(None)
+            best_param = ()
+            best_value = self.objective(())
 
         return best_param, best_value
 
@@ -457,7 +516,7 @@ print(f"Best-fit parameters: {tuple(BEST_PARAM_SINGLE)}\n")
 
 # New simulation with best-fit parameters
 CHOICES_SINGLE_BF, SUCCESSES_FIST_BF = \
-    run_simulation(seed=SEED_SINGLE + 1, agent_model=RW, 
+    run_simulation(seed=SEED_SINGLE + 1, agent_model=RW,
                    param=BEST_PARAM_SINGLE)
 
 # Get the values of the latent variables
@@ -472,30 +531,6 @@ plot.comparison_best_fit_rw_single(
     choices=CHOICES_SINGLE, successes=SUCCESSES_SINGLE,
     choices_bf=CHOICES_SINGLE_BF, successes_bf=SUCCESSES_FIST_BF,
     q_values_bf=Q_VALUES_SINGLE_BF, p_choices_bf=P_CHOICES_SINGLE_BF)
-
-
-# Population --------------------------------------------------------------
-
-# Define as parameter the best-fit parameter for the single agent
-PARAM_HOM_POP_BF = [BEST_PARAM_SINGLE for _ in range(N_SUBJECTS)]
-
-# Get behavior for best-fit
-CHOICES_HOM_POP_BF, SUCCESSES_HOM_POP_BF = \
-    run_sim_pop(model=RW, param=PARAM_HOM_POP, n_subjects=N_SUBJECTS)
-
-# Get latent variables values
-Q_VALUES_HOM_POP_BF, P_CHOICES_HOM_POP_BF = \
-    latent_variables_rw_pop(choices=CHOICES_HOM_POP_BF,
-                            successes=SUCCESSES_HOM_POP_BF,
-                            param=PARAM_HOM_POP_BF)
-
-# Plot
-plot.comparison_best_fit_rw_pop(
-    choices=CHOICES_HOM_POP, choices_bf=CHOICES_HOM_POP_BF,
-    successes=SUCCESSES_HOM_POP, successes_bf=SUCCESSES_HOM_POP_BF,
-    q_values=Q_VALUES_HOM_POP, q_values_bf=Q_VALUES_HOM_POP_BF,
-    p_choices=P_CHOICES_HOM_POP, p_choices_bf=P_CHOICES_HOM_POP_BF
-)
 
 
 # =========================================================================
@@ -515,6 +550,8 @@ def parameter_space_exploration(model, choices, successes, grid_size=20):
     :return: tuple of three vectors
     """
 
+    print("Computing data for parameter space exploration...")
+
     assert len(model.param_labels) == 2, \
         "this function is designed for models that have " \
         "at least and at most 2 parameters"
@@ -523,11 +560,6 @@ def parameter_space_exploration(model, choices, successes, grid_size=20):
 
     # Container for log-likelihood
     ll = np.zeros((grid_size, grid_size))
-
-    # Create the optimizer
-    opt = BanditOptimizer(choices=choices,
-                          successes=successes,
-                          model=model)
 
     # Create a grid for each parameter
     param0_grid = np.linspace(*model.fit_bounds[0], grid_size)
@@ -541,10 +573,11 @@ def parameter_space_exploration(model, choices, successes, grid_size=20):
             param_to_use = (param0_grid[i], param1_grid[j])
 
             # Call the objective function of the optimizer
-            ll_obs = - opt.objective(param=param_to_use)
-
-            # Backup
-            ll[j, i] = ll_obs
+            ll[j, i] = log_likelihood(
+                choices=choices,
+                successes=successes,
+                model=model,
+                param=param_to_use)
 
     # Return three vectors:
     # x: values of first parameter
@@ -566,6 +599,31 @@ plot.parameter_space_exploration(
     PARAM_SPACE_EXPLORATION,
     labels=RW.param_labels,
     title='Parameter space exploration')
+
+# ==========================================================================
+# SIMULATION HOMOGENEOUS POPULATION ========================================
+# ==========================================================================
+
+# Define as parameter the best-fit parameter for the single agent
+PARAM_HOM_POP_BF = [BEST_PARAM_SINGLE for _ in range(N_SUBJECTS)]
+
+# Get behavior for best-fit
+CHOICES_HOM_POP_BF, SUCCESSES_HOM_POP_BF = \
+    run_sim_pop(model=RW, param=PARAM_HOM_POP, n_subjects=N_SUBJECTS)
+
+# Get latent variables values
+Q_VALUES_HOM_POP_BF, P_CHOICES_HOM_POP_BF = \
+    latent_variables_rw_pop(choices=CHOICES_HOM_POP_BF,
+                            successes=SUCCESSES_HOM_POP_BF,
+                            param=PARAM_HOM_POP_BF)
+
+# Plot
+plot.comparison_best_fit_rw_pop(
+    choices=CHOICES_HOM_POP, choices_bf=CHOICES_HOM_POP_BF,
+    successes=SUCCESSES_HOM_POP, successes_bf=SUCCESSES_HOM_POP_BF,
+    q_values=Q_VALUES_HOM_POP, q_values_bf=Q_VALUES_HOM_POP_BF,
+    p_choices=P_CHOICES_HOM_POP, p_choices_bf=P_CHOICES_HOM_POP_BF
+)
 
 
 # ==========================================================================
@@ -752,8 +810,6 @@ stats.classification(CONF_MT, model_names=MODEL_NAMES)
 # Fake experiment  =====================================================
 # ======================================================================
 
-print("Fake experiment")
-
 # Get data
 SEED_HET_POP = 1234
 np.random.seed(SEED_HET_POP)
@@ -816,9 +872,7 @@ plot.model_comparison(
 
 
 @use_pickle
-def post_hoc_sim(
-        best_parameters,
-        model_xp, bic_freq, n_subjects):
+def post_hoc_sim(best_parameters, model_xp, bic_freq, n_subjects):
 
     # Look at the best model
     best_model_idx = int(np.argmax(bic_freq))

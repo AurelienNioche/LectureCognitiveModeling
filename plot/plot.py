@@ -8,27 +8,10 @@ from plot.utils import custom_ax
 from stats.stats import rolling_mean
 
 
-def learning_rate(
-        model,
-        n_iteration=100,
-        param_values=(0.01, 0.1, 0.2, 0.3)):
-
-    n_param_values = len(param_values)
-
-    values = np.zeros((n_iteration, n_param_values))
-
-    for i in range(n_param_values):
-        alpha = param_values[i]
-        agent = model(
-            q_learning_rate=alpha,
-            q_temp=None)
-        for t in range(n_iteration):
-
-            values[t, i] = agent.q_values[0]
-            agent.learn(option=0, success=1)
+def learning_rate(y_values, param_values):
 
     fig, ax = plt.subplots(figsize=(4, 4))
-    lines = ax.plot(values)
+    lines = ax.plot(y_values)
 
     ax.set_xlabel("time")
     ax.set_ylabel("value")
@@ -40,23 +23,12 @@ def learning_rate(
     plt.plot()
 
 
-def softmax_temperature(param_values=(0.05, 0.25, 0.5, 0.75)):
-
-    n_x_values = 100
-    x_values = np.linspace(-1, 1, n_x_values)
-
-    n_param_values = len(param_values)
-
-    values = np.zeros((len(x_values), n_param_values))
-
-    for i in range(n_param_values):
-        for j in range(n_x_values):
-            x = x_values[j]
-            tau = param_values[i]
-            values[j, i] = 1 / (1 + np.exp(-x/tau))
+def softmax_temperature(
+        x_values, y_values,
+        param_values):
 
     fig, ax = plt.subplots(figsize=(4, 4))
-    lines = ax.plot(x_values, values)
+    lines = ax.plot(x_values, y_values)
 
     ax.set_xlabel("Q(A) - Q(B)")
     ax.set_ylabel("p(A)")
@@ -167,7 +139,7 @@ def latent_variables_rw_and_behavior_single(
     lines = ax.plot(p_choices)
     ax.legend(lines, [f"option {i}" for i in range(n_option)])
     custom_ax(ax=ax, y_label="value",
-              title="Probabilities", legend=False,
+              title="Choice Probabilities", legend=False,
               n_iteration=len(p_choices))
 
     # Plot average behavior
@@ -225,7 +197,8 @@ def comparison_best_fit_rw_single(
     plt.show()
 
 
-def behavior_pop(choices, successes, n_option, axes=None):
+def behavior_pop(choices, successes, n_option, axes=None, title_suffix=""):
+
     if axes is None:
         show = True
         n_rows = 2
@@ -233,27 +206,29 @@ def behavior_pop(choices, successes, n_option, axes=None):
     else:
         show = False
 
+    n_subject, n_iteration = choices.shape
+
     # Plot average
     ax = axes[0]
     for i in range(n_option):
         y = choices == i
         plot_mean_std(ax=ax, y=np.asarray(y, dtype=int), label=f'option {i}')
-    custom_ax(ax=ax, y_label='freq. choice', title="Choices",
-              n_iteration=len(choices))
+    custom_ax(ax=ax, y_label='freq. choice', title=f"Choices{title_suffix}",
+              n_iteration=n_iteration)
 
     # Plot successes
     ax = axes[1]
     plot_mean_std(ax=ax, y=np.asarray(successes, dtype=int))
-    custom_ax(ax=ax, y_label='freq. success', title="Successes",
+    custom_ax(ax=ax, y_label='freq. success', title=f"Successes{title_suffix}",
               legend=False,
-              n_iteration=len(successes))
+              n_iteration=n_iteration)
 
     if show:
         plt.tight_layout()
         plt.show()
 
 
-def latent_variables_rw_pop(q_values, p_choices, axes=None):
+def latent_variables_rw_pop(q_values, p_choices, axes=None, title_suffix=""):
     if axes is None:
         show = True
         n_rows = 2
@@ -262,7 +237,7 @@ def latent_variables_rw_pop(q_values, p_choices, axes=None):
         show = False
 
     # Extract from data
-    n_option = q_values.shape[-1]
+    n_subject, n_iteration, n_option = q_values.shape
 
     # Plot q-values
     ax = axes[0]
@@ -271,8 +246,8 @@ def latent_variables_rw_pop(q_values, p_choices, axes=None):
         y = q_values[:, :, i]
         plot_mean_std(ax=ax, y=y, label=label)
 
-    custom_ax(ax=ax, y_label="value", title="Q-values",
-              n_iteration=len(q_values))
+    custom_ax(ax=ax, y_label="value", title=f"Q-values{title_suffix}",
+              n_iteration=n_iteration)
 
     # Plot choice probabilities
     ax = axes[1]
@@ -280,8 +255,8 @@ def latent_variables_rw_pop(q_values, p_choices, axes=None):
         label = f"option {i}"
         y = p_choices[:, :, i]
         plot_mean_std(ax=ax, y=y, label=label)
-    custom_ax(ax=ax, y_label='p', title='Probabilities',
-              n_iteration=len(p_choices))
+    custom_ax(ax=ax, y_label='p', title=f"Choice Probabilities{title_suffix}",
+              n_iteration=n_iteration)
 
     if show:
         plt.tight_layout()
@@ -560,11 +535,12 @@ def post_hoc_sim(
                  )
 
     behavior_pop(choices=choices_bf, successes=successes_bf,
-                 n_option=n_option,
+                 n_option=n_option, title_suffix=" [Best-Fit]",
                  axes=axes[2:4])
 
     latent_variables_rw_pop(
         q_values=q_values_bf, p_choices=p_choices_bf,
+        title_suffix=" [Best-Fit]",
         axes=axes[4:])
 
     plt.tight_layout()

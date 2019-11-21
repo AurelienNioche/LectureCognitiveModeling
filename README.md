@@ -6,7 +6,7 @@ Main claims:
 * Modeling is comparing!
 * Simulating before experimenting is helping!
 
-## 1. Task definition & Model definition
+## 1. Task model & Cognitive models
 
 ### 1.1 Task definition
 

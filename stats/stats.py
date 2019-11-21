@@ -96,7 +96,6 @@ def classification(obs, model_names):
         n = np.sum(obs[i])
         precision = k/n
         ci_low, ci_upp = confidence_interval(k, n)
-        print(f'k{k}, n{n}')
         print(f"Precision: {precision:.3f}, CI=[{ci_low:.3f}, {ci_upp:.3f}]")
 
         n = np.sum(obs[:, i])
