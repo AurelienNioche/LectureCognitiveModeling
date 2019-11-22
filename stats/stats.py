@@ -101,7 +101,6 @@ def classification(obs, model_names):
         n = np.sum(obs[:, i])
         recall = k/n
         ci_low, ci_upp = confidence_interval(k, n)
-        print(f'k{k}, n{n}')
         print(f"Recall: {recall:.3f}, CI=[{ci_low:.3f}, {ci_upp:.3f}]")
         print(f"F1 score = {2*(precision* recall)/(precision+recall):.3f}")
         print()
