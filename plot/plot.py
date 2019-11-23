@@ -34,7 +34,7 @@ def softmax_temperature(
     ax.set_ylabel("p(A)")
     ax.set_title("Effect of temperature")
 
-    ax.legend(lines, [r"$\tau=" + f'{v}$' for v in param_values])
+    ax.legend(lines, [r"$\beta=" + f'{v}$' for v in param_values])
 
     plt.plot()
 
