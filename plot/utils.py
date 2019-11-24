@@ -12,3 +12,8 @@ def custom_ax(ax, y_label, n_iteration, title=None, legend=True):
 
     if legend:
         ax.legend()
+
+
+def set_aspect_ratio(ax, ratio=1):
+
+    ax.set_aspect(1.0 / ax.get_data_ratio() * ratio)

@@ -105,13 +105,15 @@ def plot_bar_best_metric(ax, freq, y_err,
     ax.set_title(title)
 
 
-def plot_scatter_metric(data, ax, y_label, x_tick_labels, title):
+def plot_scatter_metric(data, ax, y_label, x_tick_labels, title,
+                        colors=None, dot_size=20):
 
     # Extract from data...
     n = data.shape[-1]
 
     # Colors
-    colors = np.array([f"C{i}" for i in range(n)])
+    if colors is None:
+        colors = np.array([f"C{i}" for i in range(n)])
 
     # Containers for boxplot
     positions = list(range(n))
@@ -137,8 +139,8 @@ def plot_scatter_metric(data, ax, y_label, x_tick_labels, title):
             colors_scatter.append(colors[i])
 
     # Plot the scatter
-    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=20, alpha=0.2,
-               linewidth=0.0, zorder=1)
+    ax.scatter(x_scatter, y_scatter, c=colors_scatter, s=dot_size,
+               alpha=0.2, linewidth=0.0, zorder=1)
 
     # Plot the boxplot
     bp = ax.boxplot(values_box_plot, positions=positions,

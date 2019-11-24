@@ -4,35 +4,33 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from plot.part import plot_mean_std, scatter_binary, \
     plot_bar_best_metric, plot_scatter_metric
-from plot.utils import custom_ax
+from plot.utils import custom_ax, set_aspect_ratio
 from stats.stats import rolling_mean
 
 
-def learning_rate(y_values, param_values):
+def rw_alpha(y_values, param_values):
 
     fig, ax = plt.subplots(figsize=(4, 4))
     lines = ax.plot(y_values)
 
     ax.set_xlabel("time")
-    ax.set_ylabel("value")
+    ax.set_ylabel("Q-Value")
 
-    ax.set_title("Effect of learning rate")
+    ax.set_title(r"Effect of $\alpha$")
 
     ax.legend(lines, [r"$\alpha=" + f'{v}$' for v in param_values])
 
     plt.plot()
 
 
-def softmax_temperature(
-        x_values, y_values,
-        param_values):
+def rw_beta(x_values, y_values, param_values):
 
     fig, ax = plt.subplots(figsize=(4, 4))
     lines = ax.plot(x_values, y_values)
 
     ax.set_xlabel("Q(A) - Q(B)")
     ax.set_ylabel("p(A)")
-    ax.set_title("Effect of temperature")
+    ax.set_title(r"Effect of $\beta$")
 
     ax.legend(lines, [r"$\beta=" + f'{v}$' for v in param_values])
 
@@ -171,6 +169,7 @@ def comparison_best_fit_rw_single(
         "Initial": axes[0, 0],
         "Best-fit": axes[0, 1]
     }
+
     for title, ax in titles.items():
         ax.text(0.5, 1.2, title,
                 horizontalalignment='center',
@@ -330,13 +329,72 @@ def comparison_best_fit_rw_pop(
 
 def parameter_space_exploration(
         data,
-        labels,
-        n_levels=100,
+        parameter_values,
+        true_params,
+        param_names):
+
+    # Extract from data...
+    n_param, grid_size = parameter_values.shape
+    y = data.reshape([grid_size for _ in range(n_param)])
+
+    # Create figures
+    n_rows = n_param
+    fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 3*n_rows))
+
+    axes[0].set_title("Parameter space exploration")
+
+    for i in range(n_param):
+
+        # Select relevant data
+        ax = axes[i]
+        param_name = param_names[i]
+        x = parameter_values[i]
+
+        # Compute mean and std
+        axis = list(range(n_param))
+        axis.remove(i)
+
+        mean = np.mean(y, axis=tuple(axis))
+        std = np.std(y, axis=tuple(axis))
+
+        # Plot the mean
+        ax.plot(x, mean)
+
+        # Draw the area mean-STD, mean+STD
+        ax.fill_between(
+            x,
+            mean - std,
+            mean + std,
+            alpha=0.2
+        )
+
+        ax.axvline(x=true_params[i], color='red')
+
+        ax.set_xlabel(f"{param_name}")
+        ax.set_ylabel("Likelihood")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def parameter_space_exploration_2d(
+        data,
+        parameter_values,
+        true_params,
+        param_names,
+        n_levels=200,
         title=None):
 
-    x, y, z = data
-    x_label, y_label = labels
+    # Extract from data...
+    n_param, grid_size = parameter_values.shape
+    assert n_param == 2, \
+        'This figure is made for models with exactly 2 parameters!'
 
+    x, y = parameter_values
+    z = data.reshape((grid_size, grid_size)).T
+    x_label, y_label = param_names
+
+    # Create figures
     fig, ax = plt.subplots(figsize=(5, 5))
 
     # Axes labels
@@ -353,42 +411,44 @@ def parameter_space_exploration(
     c = ax.contourf(x_coordinates, y_coordinates, z,
                     levels=n_levels, cmap='viridis')
 
-    # Add a colorbar
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = plt.colorbar(c, cax=cax)
-    cbar.ax.set_ylabel('Log likelihood')
+    ax.scatter(true_params[0], true_params[1], color='red')
 
     # Square aspect
-    ax.set_aspect(1)
+    set_aspect_ratio(ax, 1)
+
+    c_bar = fig.colorbar(c, ax=ax, aspect=20, shrink=0.635)
+    c_bar.ax.set_ylabel('Log likelihood')
 
     plt.tight_layout()
     plt.show()
 
 
-def parameter_recovery(data,
-                       x_label='Used to simulate',
-                       y_label='Recovered'):
+def parameter_recovery(
+        data,
+        param_names,
+        param_bounds,
+        x_label='Used to simulate',
+        y_label='Recovered'):
 
     # Extract data
-    keys = sorted(data.keys())
-    n_keys = len(keys)
+    n_param = len(data)
 
     # Define colors
-    colors = [f'C{i}' for i in range(n_keys)]
+    colors = [f'C{i}' for i in range(n_param)]
 
     # Create fig and axes
-    fig, axes = plt.subplots(ncols=n_keys, figsize=(3*n_keys, 3))
+    n_rows, n_cols = n_param, 1
+    fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
+                             figsize=(3*n_cols, 3*n_rows))
 
-    for i in range(n_keys):
+    for i in range(n_param):
 
         # Select ax
         ax = axes[i]
 
         # Extract data
-        k = keys[i]
-        title = k
-        x, y = data[k]
+        title = param_names[i]
+        x, y = data[i]
 
         # Create scatter
         ax.scatter(x, y, alpha=0.5, color=colors[i])
@@ -401,11 +461,20 @@ def parameter_recovery(data,
         ax.set_title(title)
 
         # Set ticks positions
-        ax.set_xticks((0, 0.5, 1))
-        ax.set_yticks((0, 0.5, 1))
+        ticks = (
+            param_bounds[i][0],
+            (param_bounds[i][1]-param_bounds[i][0])/2,
+            param_bounds[i][1],
+        )
+
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
 
         # Plot identity function
-        ax.plot(range(2), linestyle="--", alpha=0.2, color="black", zorder=-10)
+        ax.plot(
+            param_bounds[i],
+            param_bounds[i],
+            linestyle="--", alpha=0.2, color="black", zorder=-10)
 
         # Square aspect
         ax.set_aspect(1)
@@ -549,10 +618,22 @@ def post_hoc_sim(
 
 def distribution_best_parameters(best_parameters, parameter_names):
 
-    fig, ax = plt.subplots(nrows=1, figsize=(4, 2.5))
-    plot_scatter_metric(ax=ax, data=best_parameters,
-                        title="Dist. best parameters",
-                        y_label="Value",
-                        x_tick_labels=parameter_names)
+    n_subject, n_param = best_parameters.shape
+
+    fig, axes = plt.subplots(nrows=n_param, figsize=(4, 3*n_param))
+
+    for i in range(n_param):
+
+        ax = axes[i]
+        param_name = parameter_names[i]
+        title = f"Distribution of best-fit values for {param_name}"
+        data = np.atleast_2d(best_parameters[:, i]).T
+
+        plot_scatter_metric(ax=ax, data=data,
+                            title=title,
+                            y_label="Value",
+                            x_tick_labels=[param_name, ],
+                            colors=[f"C{i}", ],
+                            dot_size=40)
     plt.tight_layout()
     plt.show()

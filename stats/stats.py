@@ -39,21 +39,21 @@ def format_p(p, threshold=0.05):
     return pf
 
 
-def correlation_recovery(data):
+def correlation_recovery(data, param_names):
 
     print("\n" + "=" * 10)
     print("Statistical analysis for the parameter recovery")
     print("=" * 10 + "\n")
 
-    keys = sorted(data.keys())
-    n_keys = len(keys)
+    n_param = len(data)
 
-    for i in range(n_keys):
-        k = keys[i]
+    for i in range(n_param):
 
-        x, y = data[k]
+        param_name = param_names[i]
+        x, y = data[i]
+
         cor, p = scipy.stats.pearsonr(x, y)
-        print(f"[{k}] cor={cor:.3f}, p{format_p(p)}")
+        print(f"[{param_name}] cor={cor:.3f}, p{format_p(p)}")
 
     print()
 
