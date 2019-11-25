@@ -760,7 +760,6 @@ comparison_single_subject()
 
 @use_pickle
 def data_confusion_matrix(models, n_sets):
-
     print("Computing data for confusion matrix...")
 
     # Number of models
@@ -770,38 +769,41 @@ def data_confusion_matrix(models, n_sets):
     confusion_matrix = np.zeros((n_models, n_models))
 
     # Loop over each model
-    for i in tqdm(range(n_models)):
+    with tqdm(total=n_models * n_sets) as pbar:
+        for i in range(n_models):
 
-        # Select the model
-        model_to_sim = models[i]
+            # Select the model
+            model_to_sim = models[i]
 
-        for j in range(n_sets):
+            for j in range(n_sets):
+                # Select parameters to simulate
+                param_to_sim = \
+                    [np.random.uniform(*b)
+                     for b in model_to_sim.fit_bounds]
 
-            # Select parameters to simulate
-            param_to_sim = \
-                [np.random.uniform(*b)
-                 for b in model_to_sim.fit_bounds]
+                # Simulate
+                choices, successes = \
+                    run_simulation(
+                        seed=j,
+                        agent_model=model_to_sim,
+                        param=param_to_sim)
 
-            # Simulate
-            choices, successes = \
-                run_simulation(
-                    seed=j,
-                    agent_model=model_to_sim,
-                    param=param_to_sim)
+                # Compute bic scores
+                best_params, lls, bic_scores = \
+                    optimize_and_compare_single(choices=choices,
+                                                successes=successes)
 
-            # Compute bic scores
-            best_params, lls, bic_scores = \
-                optimize_and_compare_single(choices=choices,
-                                            successes=successes)
+                # Get minimum value for bic (min => best)
+                min_ = np.min(bic_scores)
 
-            # Get minimum value for bic (min => best)
-            min_ = np.min(bic_scores)
+                # Get index of models that get best bic
+                idx_min = np.arange(n_models)[bic_scores == min_]
 
-            # Get index of models that get best bic
-            idx_min = np.arange(n_models)[bic_scores == min_]
+                # Add result in matrix
+                confusion_matrix[i, idx_min] += 1 / len(idx_min)
 
-            # Add result in matrix
-            confusion_matrix[i, idx_min] += 1/len(idx_min)
+                # Update progress bar
+                pbar.update(1)
 
     return confusion_matrix
 
@@ -904,13 +906,14 @@ PARAM_HET_BF_BEST_MODEL = np.asarray(
 
 # Get behavior for best-fit
 CHOICES_HET_BF, SUCCESSES_HET_BF = \
-    run_sim_pop(model=RW, param=PARAM_HET_BF, n_subjects=N_SUBJECTS)
+    run_sim_pop(model=RW, param=PARAM_HET_BF_BEST_MODEL,
+                n_subjects=N_SUBJECTS)
 
 # Get latent variables values
 Q_VALUES_HET_BF, P_CHOICES_HET_BF = \
     latent_variables_rw_pop(choices=CHOICES_HET_BF,
                             successes=SUCCESSES_HET_BF,
-                            param=PARAM_HET_BF)
+                            param=PARAM_HET_BF_BEST_MODEL)
 
 plot.post_hoc_sim(
     choices=CHOICES_HET_POP,

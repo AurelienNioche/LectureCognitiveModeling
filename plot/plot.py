@@ -37,11 +37,15 @@ def rw_beta(x_values, y_values, param_values):
     plt.plot()
 
 
-def behavior_single_basic(choices, successes, n_option=2):
+def behavior_single_basic(choices, successes, n_option=2, axes=None):
 
-    # Create figure and axes
-    n_rows = 2
-    fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2*n_rows))
+    if axes is None:
+        # Create figure and axes
+        n_rows = 2
+        fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2*n_rows))
+        show = True
+    else:
+        show = False
 
     # Plot scatter choices
     scatter_binary(ax=axes[0],
@@ -58,8 +62,9 @@ def behavior_single_basic(choices, successes, n_option=2):
                    title='Successes',
                    n_option=n_option)
 
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
 
 
 def behavior_single_average(choices, successes,
@@ -116,7 +121,7 @@ def latent_variables_rw_and_behavior_single(
         axes=None):
 
     if axes is None:
-        n_rows = 6
+        n_rows = 4
         fig, axes = plt.subplots(nrows=n_rows, figsize=(4, 2.5*n_rows))
         show = True
     else:
@@ -140,9 +145,9 @@ def latent_variables_rw_and_behavior_single(
               title="Choice Probabilities", legend=False,
               n_iteration=len(p_choices))
 
-    # Plot average behavior
-    behavior_single_average(choices=choices, successes=successes,
-                            axes=axes[2:])
+    # # Plot average behavior
+    behavior_single_basic(choices=choices, successes=successes,
+                          n_option=n_option, axes=axes[2:])
 
     if show:
         plt.tight_layout()
@@ -161,7 +166,7 @@ def comparison_best_fit_rw_single(
 ):
 
     n_cols = 2
-    n_rows = 6
+    n_rows = 4
     fig, axes = plt.subplots(nrows=n_rows, ncols=n_cols,
                              figsize=(4*n_cols,  2.5*n_rows))
 
@@ -485,8 +490,8 @@ def parameter_recovery(
 
 def confusion_matrix(data, tick_labels,
                      title="Confusion matrix",
-                     x_label="Used to simulate",
-                     y_label="Recovered model"):
+                     x_label="Recovered model",
+                     y_label="Used to simulate"):
     norm_data = np.zeros(shape=data.shape)
 
     # Normalize
