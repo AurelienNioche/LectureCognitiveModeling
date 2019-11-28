@@ -15,8 +15,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 
 <!-- General and theme style sheets -->
-<link rel="stylesheet" href="reveal.js/css/reveal.css">
-<link rel="stylesheet" href="reveal.js/css/theme/simple.css" id="theme">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/css/reveal.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/css/theme/simple.css" id="theme">
 
 <!-- If the query includes 'print-pdf', include the PDF print sheet -->
 <script>
@@ -24,14 +24,14 @@ if( window.location.search.match( /print-pdf/gi ) ) {
         var link = document.createElement( 'link' );
         link.rel = 'stylesheet';
         link.type = 'text/css';
-        link.href = 'reveal.js/css/print/pdf.css';
+        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/css/print/pdf.css';
         document.getElementsByTagName( 'head' )[0].appendChild( link );
 }
 
 </script>
 
 <!--[if lt IE 9]>
-<script src="reveal.js/lib/js/html5shiv.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/lib/js/html5shiv.js"></script>
 <![endif]-->
 
 <!-- Loading the mathjax macro -->
@@ -13257,10 +13257,10 @@ a.anchor-link {
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">scipy.optimize</span>
 <span class="kn">import</span> <span class="nn">scipy.stats</span>
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
-<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">product</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="k">import</span> <span class="n">tqdm</span>
 
-<span class="kn">from</span> <span class="nn">utils.decorator</span> <span class="kn">import</span> <span class="n">use_pickle</span>
+<span class="kn">from</span> <span class="nn">utils.decorator</span> <span class="k">import</span> <span class="n">use_pickle</span>
 <span class="kn">import</span> <span class="nn">stats.stats</span> <span class="k">as</span> <span class="nn">stats</span>
 <span class="kn">import</span> <span class="nn">plot.plot</span> <span class="k">as</span> <span class="nn">plot</span>
 </pre></div>
@@ -13380,7 +13380,7 @@ a.anchor-link {
     <span class="n">param_labels</span> <span class="o">=</span> <span class="p">()</span>
     <span class="n">fit_bounds</span> <span class="o">=</span> <span class="p">()</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">choose</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -13428,7 +13428,7 @@ p_{choice}(i) = 1/N
 <span class="sd">    Random selection</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">decision_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -13472,7 +13472,7 @@ p_{choice}(i) =
     <span class="n">param_labels</span> <span class="o">=</span> <span class="s2">&quot;epsilon&quot;</span><span class="p">,</span>
     <span class="n">fit_bounds</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span>
 
@@ -13539,7 +13539,7 @@ Q^{t+1}(i) = Q^t(i) + \alpha(s - Q^t(i))
     <span class="n">param_labels</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;$\alpha$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;$\beta$&quot;</span><span class="p">,</span>
     <span class="n">fit_bounds</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">),</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q_alpha</span><span class="p">,</span> <span class="n">q_beta</span><span class="p">,</span> <span class="n">initial_value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q_alpha</span><span class="p">,</span> <span class="n">q_beta</span><span class="p">,</span> <span class="n">initial_value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">q_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">initial_value</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">q_alpha</span> <span class="o">=</span> <span class="n">q_alpha</span>
@@ -13597,7 +13597,7 @@ C^{t+1}(i) &amp;= C^t(i) + \alpha(a^t(i) - C^t(i)) \\
     <span class="n">param_labels</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;alpha_q&quot;</span><span class="p">,</span> <span class="s2">&quot;beta_q&quot;</span><span class="p">,</span> <span class="s2">&quot;alpha_c&quot;</span><span class="p">,</span> <span class="s2">&quot;beta_c&quot;</span><span class="p">)</span>
     <span class="n">fit_bounds</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">q_alpha</span><span class="p">,</span> <span class="n">q_beta</span><span class="p">,</span> <span class="n">c_alpha</span><span class="p">,</span> <span class="n">c_beta</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">q_alpha</span><span class="p">,</span> <span class="n">q_beta</span><span class="p">,</span> <span class="n">c_alpha</span><span class="p">,</span> <span class="n">c_beta</span><span class="p">):</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">q_alpha</span><span class="o">=</span><span class="n">q_alpha</span><span class="p">,</span> <span class="n">q_beta</span><span class="o">=</span><span class="n">q_beta</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">c_alpha</span> <span class="o">=</span> <span class="n">c_alpha</span>
@@ -13861,7 +13861,7 @@ C^{t+1}(i) &amp;= C^t(i) + \alpha(a^t(i) - C^t(i)) \\
 <div class=" highlight hl-ipython3"><pre><span></span><span class="nd">@use_pickle</span>
 <span class="k">def</span> <span class="nf">run_sim_pop</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">n_subjects</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running simulation for </span><span class="si">{n_subjects}</span><span class="s2"> agents...&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Running simulation for </span><span class="si">{n_subjects}</span><span class="s2"> agents...&quot;</span><span class="p">)</span>
 
     <span class="c1"># Data containers</span>
     <span class="n">choices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_subjects</span><span class="p">,</span> <span class="n">T</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
@@ -14204,14 +14204,14 @@ C^{t+1}(i) &amp;= C^t(i) + \alpha(a^t(i) - C^t(i)) \\
 <span class="sd">    estimate the best-fit param</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">choices</span><span class="p">,</span> <span class="n">successes</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">choices</span><span class="p">,</span> <span class="n">successes</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">choices</span> <span class="o">=</span> <span class="n">choices</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">successes</span> <span class="o">=</span> <span class="n">successes</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
 
         <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;fit_bounds&#39;</span><span class="p">),</span> \
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{model.__name__}</span><span class="s2"> has not &#39;fit_bounds&#39; attribute&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="si">{model.__name__}</span><span class="s2"> has not &#39;fit_bounds&#39; attribute&quot;</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="mi">0</span>
 
@@ -14287,8 +14287,8 @@ you retrieve close enough parameters.
 
 <span class="c1"># Get the best-fit parameters</span>
 <span class="n">BEST_PARAM_SINGLE</span> <span class="o">=</span> <span class="n">get_best_param</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;True&#39; parameters: {tuple(PARAM_SINGLE)}&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best-fit parameters: {tuple(BEST_PARAM_SINGLE)}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;&#39;True&#39; parameters: {tuple(PARAM_SINGLE)}&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Best-fit parameters: {tuple(BEST_PARAM_SINGLE)}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -14411,7 +14411,7 @@ Best-fit parameters: (0.09144770878290102, 10.947370614002782)
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Computing data for parameter space exploration...&quot;</span><span class="p">)</span>
 
     <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;fit_bounds&#39;</span><span class="p">),</span> \
-        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{model.__name__}</span><span class="s2"> has not &#39;fit_bounds&#39; attribute&quot;</span>
+        <span class="n">f</span><span class="s2">&quot;</span><span class="si">{model.__name__}</span><span class="s2"> has not &#39;fit_bounds&#39; attribute&quot;</span>
 
     <span class="n">n_param</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">fit_bounds</span><span class="p">)</span>
 
@@ -14882,11 +14882,11 @@ Statistical analysis for the parameter recovery
         <span class="n">optimize_and_compare_single</span><span class="p">(</span>
             <span class="n">choices</span><span class="o">=</span><span class="n">CHOICES_SINGLE</span><span class="p">,</span> <span class="n">successes</span><span class="o">=</span><span class="n">SUCCESSES_SINGLE</span><span class="p">)</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model used: </span><span class="si">{MODEL_XP.__name__}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Model used: </span><span class="si">{MODEL_XP.__name__}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">10</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">MODELS</span><span class="p">)):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;BIC </span><span class="si">{MODELS[i].__name__}</span><span class="s2"> = </span><span class="si">{bic_scores[i]:.3f}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;BIC </span><span class="si">{MODELS[i].__name__}</span><span class="s2"> = </span><span class="si">{bic_scores[i]:.3f}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="nb">print</span><span class="p">()</span>
 
@@ -15578,8 +15578,8 @@ require(
       waitSeconds: 15
     },
     [
-      "reveal.js/lib/js/head.min.js",
-      "reveal.js/js/reveal.js"
+      "https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/lib/js/head.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/js/reveal.js"
     ],
 
     function(head, Reveal){
@@ -15594,9 +15594,9 @@ require(
 
             // Optional libraries used to extend on reveal.js
             dependencies: [
-                { src: "reveal.js/lib/js/classList.js",
+                { src: "https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/lib/js/classList.js",
                   condition: function() { return !document.body.classList; } },
-                { src: "reveal.js/plugin/notes/notes.js",
+                { src: "https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.5.0/plugin/notes/notes.js",
                   async: true,
                   condition: function() { return !!document.body.classList; } }
             ]
@@ -15611,17 +15611,17 @@ require(
         Reveal.addEventListener('slidechanged', update);
 
         function setScrollingSlide() {
-            var scroll = true
-            if (scroll === true) {
-              var h = $('.reveal').height() * 0.95;
-              $('section.present').find('section')
-                .filter(function() {
-                  return $(this).height() > h;
-                })
-                .css('height', 'calc(95vh)')
-                .css('overflow-y', 'scroll')
-                .css('margin-top', '20px');
-            }
+            if  (scroll === true) {
+  var h = $('.reveal').height() * 0.75;
+  $('section.present').find('section')
+    .filter(function() {
+      return $(this).height() > h;
+    })
+    .css('height', 'calc(75vh)')
+    .css('overflow-y', 'scroll')
+    .css('margin-top', '20px');
+}
+
         }
 
         // check and set the scrolling slide every time the slide change
