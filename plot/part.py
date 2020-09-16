@@ -16,8 +16,7 @@ def plot_mean_std(ax, label=None, y=None):
         range(len(mean)),
         mean - std,
         mean + std,
-        alpha=0.2
-    )
+        alpha=0.2)
 
 
 def scatter_binary(ax, y, n_option,
